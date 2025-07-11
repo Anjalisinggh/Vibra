@@ -46,6 +46,7 @@ import {
   User,
   Trash2,
   Share2,
+  Menu,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -198,6 +199,7 @@ export default function VibraApp() {
   const [authLoading, setAuthLoading] = useState(false)
   const [allMessages, setAllMessages] = useState<AnonymousMessage[]>([])
   const [messageSuccess, setMessageSuccess] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const router = useRouter()
 
@@ -715,8 +717,10 @@ export default function VibraApp() {
       setNewPlaylistName("")
       setNewPlaylistDescription("")
       setShowCreatePlaylist(false)
+      toast.success(`Playlist "${newPlaylist.name}" created successfully`)
     } catch (error) {
       console.error("Error creating playlist:", error)
+      toast.error("Failed to create playlist")
     }
   }
 
@@ -762,8 +766,10 @@ export default function VibraApp() {
       }
 
       setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, songs: updatedSongs } : p)))
+      toast.success("Song removed from playlist")
     } catch (error) {
       console.error("Error removing from playlist:", error)
+      toast.error("Failed to remove song from playlist")
     }
   }
 
@@ -798,6 +804,7 @@ export default function VibraApp() {
 
       setMessageSuccess(true)
       setNewMessage("")
+      toast.success("Your anonymous message has been shared")
 
       // Auto-close after 2 seconds
       setTimeout(() => {
@@ -806,7 +813,7 @@ export default function VibraApp() {
       }, 2000)
     } catch (error) {
       console.error("Error adding message:", error)
-      alert("Failed to send message. Please try again.")
+      toast.error("Failed to send message. Please try again.")
     }
   }
 
@@ -815,24 +822,40 @@ export default function VibraApp() {
       await updateDoc(doc(db, "messages", messageId), {
         likes: increment(1),
       })
+      toast.success("Message liked")
     } catch (error) {
       console.error("Error liking message:", error)
+      toast.error("Failed to like message")
     }
   }
 
-  const handleShare = (song: Song) => {
-    if (navigator.share) {
-      navigator.share({
-        title: song.title,
-        text: `Check out this song: ${song.title} by ${song.artist}`,
-        url: song.externalUrl || window.location.href,
-      })
-      .then(() => toast.success('Shared successfully'))
-      .catch((error) => toast.error('Error sharing:', error))
-    } else {
-      // Fallback for browsers that don't support Web Share API
-      navigator.clipboard.writeText(`${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`)
-      toast.success('Link copied to clipboard!')
+  const handleShare = async (song: Song) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: song.title,
+          text: `Check out this song: ${song.title} by ${song.artist}`,
+          url: song.externalUrl || window.location.href,
+        })
+        toast.success('Shared successfully')
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(
+          `${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`
+        )
+        toast.success('Link copied to clipboard!')
+      } else {
+        // Fallback for browsers that don't support either API
+        const textArea = document.createElement('textarea')
+        textArea.value = `${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+        toast.success('Link copied to clipboard!')
+      }
+    } catch (error) {
+      console.error('Error sharing:', error)
+      toast.error('Failed to share')
     }
   }
 
@@ -860,14 +883,18 @@ export default function VibraApp() {
         .then(() => {
           setCurrentAudio(audio)
           setCurrentlyPlaying(song.id)
+          toast.success(`Now playing: ${song.title}`)
         })
         .catch((error) => {
           console.error("Error playing audio:", error)
+          toast.error("Failed to play audio")
         })
 
       audio.onended = () => {
         handleSongEnd()
       }
+    } else {
+      toast.error("No audio URL available for this song")
     }
   }
 
@@ -928,6 +955,7 @@ export default function VibraApp() {
     const currentIndex = modes.indexOf(repeatMode)
     const nextIndex = (currentIndex + 1) % modes.length
     setRepeatMode(modes[nextIndex])
+    toast.success(`Repeat mode: ${modes[nextIndex]}`)
   }
 
   // Play/Pause audio
@@ -938,6 +966,7 @@ export default function VibraApp() {
         setCurrentAudio(null)
       }
       setCurrentlyPlaying(null)
+      toast.info(`Paused: ${song.title}`)
     } else {
       playSpecificSong(song)
     }
@@ -947,6 +976,8 @@ export default function VibraApp() {
   const openExternalLink = (url: string) => {
     if (url) {
       window.open(url, "_blank", "noopener,noreferrer")
+    } else {
+      toast.error("No external URL available for this song")
     }
   }
 
@@ -992,6 +1023,16 @@ export default function VibraApp() {
     { key: "nostalgia", label: "Nostalgia", icon: "🌅" },
     { key: "empowerment", label: "Empowerment", icon: "💪" },
     { key: "contemplative", label: "Contemplative", icon: "🤔" },
+    { key: "melancholy", label: "Melancholy", icon: "😔" },
+    { key: "upbeat", label: "Upbeat", icon: "🎉" },
+    { key: "romantic", label: "Romantic", icon: "🌹" },
+    { key: "epic", label: "Epic", icon: "🏛️" },
+    { key: "dramatic", label: "Dramatic", icon: "🎭" },
+    { key: "introspective", label: "Introspective", icon: "🧠" },
+    { key: "lonely", label: "Lonely", icon: "🌌" },
+    { key: "tender", label: "Tender", icon: "💝" },
+    { key: "celebration", label: "Celebration", icon: "🎊" },
+    { key: "motivational", label: "Motivational", icon: "🔥" },
   ]
 
   return (
@@ -1012,7 +1053,15 @@ export default function VibraApp() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Mobile Menu Button */}
+            <div className="flex items-center gap-2 sm:hidden">
+              <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+                <Menu className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Desktop Navigation */}
+            <div className="hidden sm:flex items-center gap-2">
               {user ? (
                 <div className="flex items-center gap-2">
                   <Dialog open={showPlaylists} onOpenChange={setShowPlaylists}>
@@ -1313,6 +1362,133 @@ export default function VibraApp() {
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-4 space-y-4">
+            {user ? (
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setShowPlaylists(true)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <ListMusic className="h-4 w-4 mr-2" />
+                  Playlists ({playlists.length})
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setShowProfile(true)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Profile
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setIsDarkMode(!isDarkMode)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  {isDarkMode ? (
+                    <Sun className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Moon className="h-4 w-4 mr-2" />
+                  )}
+                  {isDarkMode ? "Light Mode" : "Dark Mode"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setViewMode(viewMode === "grid" ? "list" : "grid")
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  {viewMode === "grid" ? (
+                    <List className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Grid3X3 className="h-4 w-4 mr-2" />
+                  )}
+                  {viewMode === "grid" ? "List View" : "Grid View"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-red-600"
+                  onClick={() => {
+                    handleSignOut()
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setShowSignIn(true)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Sign In
+                </Button>
+                <Button
+                  className="w-full justify-start bg-gradient-to-r from-purple-600 to-pink-600"
+                  onClick={() => {
+                    setShowSignUp(true)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Sign Up
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setIsDarkMode(!isDarkMode)
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  {isDarkMode ? (
+                    <Sun className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Moon className="h-4 w-4 mr-2" />
+                  )}
+                  {isDarkMode ? "Light Mode" : "Dark Mode"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setViewMode(viewMode === "grid" ? "list" : "grid")
+                    setMobileMenuOpen(false)
+                  }}
+                >
+                  {viewMode === "grid" ? (
+                    <List className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Grid3X3 className="h-4 w-4 mr-2" />
+                  )}
+                  {viewMode === "grid" ? "List View" : "Grid View"}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </header>
 
       {/* Now Playing Bar */}
@@ -1481,6 +1657,14 @@ export default function VibraApp() {
                               <ExternalLink className="h-3 w-3" />
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-6 w-6 p-0"
+                            onClick={() => handleShare(song)}
+                          >
+                            <Share2 className="h-3 w-3" />
+                          </Button>
                         </div>
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                           <Button
@@ -1699,7 +1883,7 @@ export default function VibraApp() {
                       <img
                         src={song.coverUrl || "/placeholder.svg"}
                         alt={`${song.title} cover`}
-                        className="w-20 h-20 object-cover rounded-lg"
+                        className="w-20 h-20 rounded-lg object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
                           target.src = "/placeholder.svg?height=300&width=300"
@@ -1825,18 +2009,6 @@ export default function VibraApp() {
           <div className="text-center md:text-left">
             <h2 className="text-2xl font-bold text-pink-200">Vibra</h2>
             <p className="text-sm text-pink-100 mt-1">Feel it. Share it. Play it.</p>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Link href="https://instagram.com" target="_blank" rel="noopener noreferrer">
-              <FaInstagram className="h-5 w-5 hover:text-pink-300 transition-colors" />
-            </Link>
-            <Link href="https://twitter.com" target="_blank" rel="noopener noreferrer">
-              <FaTwitter className="h-5 w-5 hover:text-blue-300 transition-colors" />
-            </Link>
-            <Link href="https://github.com" target="_blank" rel="noopener noreferrer">
-              <FaGithub className="h-5 w-5 hover:text-gray-300 transition-colors" />
-            </Link>
           </div>
 
           <div className="text-center md:text-right text-xs text-pink-200">
