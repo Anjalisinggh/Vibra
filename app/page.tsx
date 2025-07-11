@@ -955,7 +955,7 @@ export default function VibraApp() {
   const moodFilters = [
     { key: "love", label: "Love & Romance", icon: "💕" },
     { key: "joy", label: "Joy & Happiness", icon: "😊" },
-    { key: "melancholy", label: "Melancholy", icon: "😔" },
+   
     { key: "energetic", label: "Energetic", icon: "⚡" },
     { key: "peaceful", label: "Peaceful", icon: "🕊️" },
     { key: "nostalgia", label: "Nostalgia", icon: "🌅" },
@@ -1329,18 +1329,15 @@ export default function VibraApp() {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Sparkles className="h-6 w-6 text-purple-600" />
+            
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
               Where your emotions meet their soundtrack
             </h2>
-            <Sparkles className="h-6 w-6 text-pink-600" />
+           
           </div>
-          <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-6">
-            Discover songs from Saavn that match your mood. Search by song name, artist, or emotion. Create playlists
-            and share your deepest thoughts anonymously.
-          </p>
+          
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <Heart className="h-4 w-4 text-pink-500" />
+           
             <span className="italic">
               "Every song tells a story, every story finds its song - especially those love and romance melodies that
               speak to the heart"
