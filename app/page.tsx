@@ -1783,22 +1783,12 @@ export default function VibraApp() {
           <p className="text-sm text-pink-100 mt-1">Feel it. Share it. Play it.</p>
         </div>
 
-  <div className="flex gap-5 text-lime-100 text-xl">
-          <a href="https://www.instagram.com/anjalisinggh_12/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-            <FaInstagram />
-          </a>
-          <a href="https://x.com/anjalisinggh12/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-            <FaTwitter />
-          </a>
-          <a href="https://github.com/Anjalisinggh" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">
-            <FaGithub />
-          </a>
-        </div>
+ 
       
         
 
         <div className="text-center md:text-right text-xs text-pink-200">
-          © {new Date().getFullYear()} Vibra by Anjali Singh. All rights reserved.
+          © {new Date().getFullYear()} Vibra by 🤍. All rights reserved.
         </div>
       </div>
     </footer>
