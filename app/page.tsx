@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import Link from "next/link"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -1764,6 +1765,7 @@ export default function VibraApp() {
               />
             </div>
           </div>
+          
           <div className="flex justify-end gap-2 mt-4">
             <Button type="button" variant="outline" onClick={() => setShowCreatePlaylist(false)}>
               Cancel
@@ -1774,6 +1776,20 @@ export default function VibraApp() {
           </div>
         </DialogContent>
       </Dialog>
+     <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-3 px-4 mt-16">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="text-center md:text-left">
+          <h2 className="text-2xl font-bold text-pink-200">Vibra</h2>
+          <p className="text-sm text-pink-100 mt-1">Feel it. Share it. Play it.</p>
+        </div>
+
+        
+
+        <div className="text-center md:text-right text-xs text-pink-200">
+          © {new Date().getFullYear()} Vibra by Anjali Singh. All rights reserved.
+        </div>
+      </div>
+    </footer>
     </div>
   )
 }
