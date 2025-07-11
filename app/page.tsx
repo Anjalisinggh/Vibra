@@ -1,7 +1,6 @@
 "use client"
 import { FaInstagram, FaTwitter, FaGithub } from "react-icons/fa"
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -45,7 +44,10 @@ import {
   ExternalLink,
   Filter,
   User,
+  Trash2,
+  Share2,
 } from "lucide-react"
+import { toast } from "sonner"
 
 // Firebase imports
 import {
@@ -67,12 +69,13 @@ import {
   increment,
   onSnapshot,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
-// Make sure your "@/lib/firebase" exports 'auth' created with getAuth(app) and 'db'
 
-// Add the router import at the top:
+// Router import
 import { useRouter } from "next/navigation"
+import { Toaster } from "@/components/ui/sonner"
 
 interface Song {
   id: string
@@ -135,7 +138,7 @@ const moodColors = {
   edgy: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
 }
 
-// Mood-based search queries for different emotions
+// Mood-based search queries
 const moodQueries = {
   joy: ["happy songs", "upbeat music", "feel good songs", "celebration", "cheerful music"],
   love: ["love songs", "romantic music", "valentine songs", "couple songs", "romance"],
@@ -177,8 +180,6 @@ export default function VibraApp() {
   const [isLoading, setIsLoading] = useState(false)
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
   const [showProfile, setShowProfile] = useState(false)
-
-  // Playlist states
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [currentPlaylist, setCurrentPlaylist] = useState<Playlist | null>(null)
   const [currentSongIndex, setCurrentSongIndex] = useState(0)
@@ -188,8 +189,6 @@ export default function VibraApp() {
   const [showPlaylists, setShowPlaylists] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState("")
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("")
-
-  // Authentication states
   const [user, setUser] = useState<AppUser | null>(null)
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
   const [showSignIn, setShowSignIn] = useState(false)
@@ -197,14 +196,9 @@ export default function VibraApp() {
   const [signInData, setSignInData] = useState({ email: "", password: "" })
   const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "", confirmPassword: "" })
   const [authLoading, setAuthLoading] = useState(false)
-
-  // Messages state
   const [allMessages, setAllMessages] = useState<AnonymousMessage[]>([])
-
-  // Add success state and auto-close functionality by adding these state variables at the top:
   const [messageSuccess, setMessageSuccess] = useState(false)
 
-  // Add router initialization in the component:
   const router = useRouter()
 
   // Toggle dark mode
@@ -278,7 +272,6 @@ export default function VibraApp() {
 
     const moods: string[] = []
 
-    // Enhanced mood detection based on keywords
     if (text.includes("love") || text.includes("heart") || text.includes("romantic") || text.includes("kiss")) {
       moods.push("love", "romantic")
     }
@@ -732,7 +725,13 @@ export default function VibraApp() {
       const playlist = playlists.find((p) => p.id === playlistId)
       if (!playlist) return
 
-      const updatedSongs = [...playlist.songs.filter((s) => s.id !== song.id), song]
+      // Check if song already exists in playlist
+      if (playlist.songs.some(s => s.id === song.id)) {
+        toast.info(`"${song.title}" is already in "${playlist.name}"`)
+        return
+      }
+
+      const updatedSongs = [...playlist.songs, song]
 
       if (playlist.firebaseId) {
         await updateDoc(doc(db, "playlists", playlist.firebaseId), {
@@ -741,8 +740,11 @@ export default function VibraApp() {
       }
 
       setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, songs: updatedSongs } : p)))
+      
+      toast.success(`"${song.title}" added to "${playlist.name}"`)
     } catch (error) {
       console.error("Error adding to playlist:", error)
+      toast.error('Failed to add song to playlist')
     }
   }
 
@@ -765,7 +767,20 @@ export default function VibraApp() {
     }
   }
 
-  // Add the following updated addAnonymousMessage function:
+  const deletePlaylist = async (playlistId: string) => {
+    try {
+      const playlist = playlists.find((p) => p.id === playlistId)
+      if (!playlist || !playlist.firebaseId) return
+
+      await deleteDoc(doc(db, "playlists", playlist.firebaseId))
+      setPlaylists((prev) => prev.filter((p) => p.id !== playlistId))
+      toast.success(`Playlist "${playlist.name}" deleted`)
+    } catch (error) {
+      console.error("Error deleting playlist:", error)
+      toast.error('Failed to delete playlist')
+    }
+  }
+
   const addAnonymousMessage = async (songId: string) => {
     if (!newMessage.trim()) return
 
@@ -802,6 +817,22 @@ export default function VibraApp() {
       })
     } catch (error) {
       console.error("Error liking message:", error)
+    }
+  }
+
+  const handleShare = (song: Song) => {
+    if (navigator.share) {
+      navigator.share({
+        title: song.title,
+        text: `Check out this song: ${song.title} by ${song.artist}`,
+        url: song.externalUrl || window.location.href,
+      })
+      .then(() => toast.success('Shared successfully'))
+      .catch((error) => toast.error('Error sharing:', error))
+    } else {
+      // Fallback for browsers that don't support Web Share API
+      navigator.clipboard.writeText(`${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`)
+      toast.success('Link copied to clipboard!')
     }
   }
 
@@ -956,7 +987,6 @@ export default function VibraApp() {
   const moodFilters = [
     { key: "love", label: "Love & Romance", icon: "💕" },
     { key: "joy", label: "Joy & Happiness", icon: "😊" },
-   
     { key: "energetic", label: "Energetic", icon: "⚡" },
     { key: "peaceful", label: "Peaceful", icon: "🕊️" },
     { key: "nostalgia", label: "Nostalgia", icon: "🌅" },
@@ -1032,6 +1062,14 @@ export default function VibraApp() {
                                   >
                                     <PlayCircle className="h-4 w-4 mr-1" />
                                     Play
+                                  </Button>
+                                  <Button
+                                    onClick={() => deletePlaylist(playlist.id)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </div>
@@ -1330,15 +1368,11 @@ export default function VibraApp() {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-2 mb-4">
-            
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
               Where your emotions meet their soundtrack
             </h2>
-           
           </div>
-          
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-           
             <span className="italic">
               "Every song tells a story, every story finds its song - especially those love and romance melodies that
               speak to the heart"
@@ -1495,7 +1529,6 @@ export default function VibraApp() {
                           </div>
                         </div>
 
-                        {/* In the songs grid/list section, replace the current message buttons with separate Read and Send buttons: */}
                         <div className="flex gap-2">
                           {user && playlists.length > 0 && (
                             <Dialog>
@@ -1721,6 +1754,14 @@ export default function VibraApp() {
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         )}
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleShare(song)}
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   )}
@@ -1776,22 +1817,33 @@ export default function VibraApp() {
           </div>
         </DialogContent>
       </Dialog>
-     <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-3 px-4 mt-16">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-        <div className="text-center md:text-left">
-          <h2 className="text-2xl font-bold text-pink-200">Vibra</h2>
-          <p className="text-sm text-pink-100 mt-1">Feel it. Share it. Play it.</p>
-        </div>
 
- 
+      <Toaster richColors position="top-center" />
       
-        
+      <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-3 px-4 mt-16">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-center md:text-left">
+            <h2 className="text-2xl font-bold text-pink-200">Vibra</h2>
+            <p className="text-sm text-pink-100 mt-1">Feel it. Share it. Play it.</p>
+          </div>
 
-        <div className="text-center md:text-right text-xs text-pink-200">
-          © {new Date().getFullYear()} Vibra by 🤍. All rights reserved.
+          <div className="flex items-center gap-4">
+            <Link href="https://instagram.com" target="_blank" rel="noopener noreferrer">
+              <FaInstagram className="h-5 w-5 hover:text-pink-300 transition-colors" />
+            </Link>
+            <Link href="https://twitter.com" target="_blank" rel="noopener noreferrer">
+              <FaTwitter className="h-5 w-5 hover:text-blue-300 transition-colors" />
+            </Link>
+            <Link href="https://github.com" target="_blank" rel="noopener noreferrer">
+              <FaGithub className="h-5 w-5 hover:text-gray-300 transition-colors" />
+            </Link>
+          </div>
+
+          <div className="text-center md:text-right text-xs text-pink-200">
+            © {new Date().getFullYear()} Vibra by 🤍. All rights reserved.
+          </div>
         </div>
-      </div>
-    </footer>
+      </footer>
     </div>
   )
 }
