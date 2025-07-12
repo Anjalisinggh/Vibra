@@ -237,15 +237,19 @@ export default function VibraApp() {
     return () => unsubscribe()
   }, [])
 
-  // Load messages from Firebase
-  useEffect(() => {
-    const loadMessages = async () => {
+  // Combined data loading function
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    try {
+      // 1. First load songs
+      const initialSongs = await loadInitialSongs();
+      
+      // 2. Then load messages
       const messagesRef = collection(db, "messages");
       const q = query(messagesRef, orderBy("timestamp", "desc"));
-      
       const querySnapshot = await getDocs(q);
-      const initialMessages: AnonymousMessage[] = [];
       
+      const initialMessages: AnonymousMessage[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         initialMessages.push({
@@ -259,10 +263,16 @@ export default function VibraApp() {
         });
       });
 
+      // 3. Associate messages with songs before setting state
+      const songsWithMessages = initialSongs.map(song => ({
+        ...song,
+        messages: initialMessages.filter(msg => msg.songId === song.id),
+      }));
+
+      setSongs(songsWithMessages);
       setAllMessages(initialMessages);
-      associateMessagesWithSongs(initialMessages);
       
-      // Then set up real-time listener
+      // 4. Set up real-time listener
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const updatedMessages: AnonymousMessage[] = [];
         snapshot.forEach((doc) => {
@@ -277,87 +287,38 @@ export default function VibraApp() {
             likedBy: data.likedBy || []
           });
         });
+
+        // Update both messages and songs
         setAllMessages(updatedMessages);
-        associateMessagesWithSongs(updatedMessages);
+        setSongs(prevSongs => 
+          prevSongs.map(song => ({
+            ...song,
+            messages: updatedMessages.filter(msg => msg.songId === song.id),
+          }))
+        );
       });
 
-      return () => unsubscribe();
-    };
+      return unsubscribe;
+    } catch (error) {
+      console.error("Error loading initial data:", error);
+      // Fallback to empty state
+      setSongs(getFallbackSongs(""));
+      setAllMessages([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const associateMessagesWithSongs = (messages: AnonymousMessage[]) => {
-      setSongs(prevSongs => 
-        prevSongs.map(song => ({
-          ...song,
-          messages: messages.filter(msg => msg.songId === song.id),
-        }))
-      );
-    };
-
-    loadMessages();
-  }, []);
-
-  // Load initial songs on component mount
+  // Load initial data on component mount
   useEffect(() => {
-    loadInitialSongs()
-  }, [])
-  // Update your useEffect for loading messages
-useEffect(() => {
-  const loadMessages = async () => {
-    const messagesRef = collection(db, "messages");
-    const q = query(messagesRef, orderBy("timestamp", "desc"));
+    const unsubscribePromise = loadInitialData();
     
-    const querySnapshot = await getDocs(q);
-    const initialMessages: AnonymousMessage[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      initialMessages.push({
-        id: doc.id,
-        content: data.content,
-        emotion: data.emotion,
-        timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
-        likes: data.likes || 0,
-        songId: data.songId,
-        likedBy: data.likedBy || []
+    return () => {
+      unsubscribePromise.then(unsubscribe => {
+        if (unsubscribe) unsubscribe();
       });
-    });
-
-    setAllMessages(initialMessages);
-    associateMessagesWithSongs(initialMessages);
-    
-    // Then set up real-time listener
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const updatedMessages: AnonymousMessage[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        updatedMessages.push({
-          id: doc.id,
-          content: data.content,
-          emotion: data.emotion,
-          timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
-          likes: data.likes || 0,
-          songId: data.songId,
-          likedBy: data.likedBy || []
-        });
-      });
-      setAllMessages(updatedMessages);
-      associateMessagesWithSongs(updatedMessages);
-    });
-
-    return () => unsubscribe();
-  };
-
-  const associateMessagesWithSongs = (messages: AnonymousMessage[]) => {
-    setSongs(prevSongs => 
-      prevSongs.map(song => ({
-        ...song,
-        messages: messages.filter(msg => msg.songId === song.id),
-      }))
-    );
-  };
-
-  loadMessages();
-}, []);
+    };
+  }, []);
 
   // Function to assign mood based on song title and artist
   const assignMoodToSong = (title: string, artist: string): string[] => {
@@ -501,7 +462,7 @@ useEffect(() => {
               "",
             previewUrl: "",
             externalUrl: saavnSong.url || "",
-            messages: [],
+            messages: [], // Will be populated later
             plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
             duration: saavnSong.duration || 180,
             source: "saavn",
@@ -626,8 +587,7 @@ useEffect(() => {
   }
 
   // Load initial songs from Saavn API
-  const loadInitialSongs = async () => {
-    setIsLoading(true)
+  const loadInitialSongs = async (): Promise<Song[]> => {
     try {
       const queries = [
         "bollywood hits",
@@ -671,19 +631,17 @@ useEffect(() => {
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
 
-      setSongs(uniqueSongs)
+      return uniqueSongs;
     } catch (error) {
       console.error("Error loading initial songs:", error)
-      setSongs(getFallbackSongs(""))
-    } finally {
-      setIsLoading(false)
+      return getFallbackSongs("")
     }
   }
 
   // Search songs from Saavn API
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      loadInitialSongs()
+      loadInitialData()
       return
     }
 
@@ -723,7 +681,7 @@ useEffect(() => {
     setSelectedMood(mood)
 
     if (!mood) {
-      loadInitialSongs()
+      loadInitialData()
       return
     }
 
