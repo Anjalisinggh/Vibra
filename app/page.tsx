@@ -1,7 +1,7 @@
 "use client"
 import { FaInstagram, FaTwitter, FaGithub } from "react-icons/fa"
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,6 +49,7 @@ import {
   Menu,
 } from "lucide-react"
 import { toast } from "sonner"
+import { Progress } from "@/components/ui/progress"
 
 // Firebase imports
 import {
@@ -200,6 +201,9 @@ export default function VibraApp() {
   const [allMessages, setAllMessages] = useState<AnonymousMessage[]>([])
   const [messageSuccess, setMessageSuccess] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [playbackProgress, setPlaybackProgress] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const progressInterval = useRef<NodeJS.Timeout | null>(null)
 
   const router = useRouter()
 
@@ -422,6 +426,49 @@ export default function VibraApp() {
     }
   }
 
+  // Function to fetch a song by ID
+  const fetchSongById = async (id: string): Promise<Song | null> => {
+    try {
+      const saavnId = id.replace("saavn_", "")
+      const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`)
+      const data = await res.json()
+
+      if (data.success && data.data && data.data.length > 0) {
+        const saavnSong = data.data[0]
+        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
+        const moods = assignMoodToSong(saavnSong.name, artist)
+        const emotion = getPrimaryEmotion(moods)
+
+        return {
+          id: `saavn_${saavnSong.id}`,
+          title: saavnSong.name,
+          artist: artist,
+          primaryArtists: artist,
+          mood: moods,
+          emotion: emotion,
+          coverUrl:
+            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+            saavnSong.image?.[saavnSong.image.length - 1]?.url ||
+            "/placeholder.svg?height=300&width=300",
+          audioUrl:
+            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+            saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
+            "",
+          previewUrl: "",
+          externalUrl: saavnSong.url || "",
+          messages: allMessages.filter(msg => msg.songId === `saavn_${saavnSong.id}`),
+          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+          duration: saavnSong.duration || 180,
+          source: "saavn",
+        }
+      }
+      return null
+    } catch (error) {
+      console.error("Error fetching song by ID:", error)
+      return null
+    }
+  }
+
   // Fallback songs when APIs fail
   const getFallbackSongs = (query: string): Song[] => {
     const fallbackTracks = [
@@ -554,13 +601,26 @@ export default function VibraApp() {
     setIsLoading(true)
     try {
       const results = await fetchSaavnSongs(searchQuery)
+      
+      // Also search messages
+      const messagesSnapshot = await getDocs(
+        query(
+          collection(db, "messages"), 
+          where("content", ">=", searchQuery),
+          where("content", "<=", searchQuery + "\uf8ff")
+        )
+      )
+      
+      const songIds = [...new Set(messagesSnapshot.docs.map(d => d.data().songId))]
+      const songPromises = songIds.map(id => fetchSongById(id))
+      const newSongs = (await Promise.all(songPromises)).filter(Boolean)
+      
+      // Combine results
+      const combinedSongs = [...results, ...newSongs].filter(
+        (song, index, self) => song && index === self.findIndex(s => s && s.id === song.id)
+      )
 
-      // If no results, use fallback
-      if (results.length === 0) {
-        setSongs(getFallbackSongs(searchQuery))
-      } else {
-        setSongs(results)
-      }
+      setSongs(combinedSongs.length > 0 ? combinedSongs.filter((s): s is Song => s !== null) : getFallbackSongs(searchQuery))
     } catch (error) {
       console.error("Error searching songs:", error)
       setSongs(getFallbackSongs(searchQuery))
@@ -801,12 +861,20 @@ export default function VibraApp() {
       }
 
       await addDoc(collection(db, "messages"), messageData)
+      
+      // Check if song exists in current state
+      const songExists = songs.some(s => s.id === songId)
+      if (!songExists) {
+        const newSong = await fetchSongById(songId)
+        if (newSong) {
+          setSongs(prev => [...prev, newSong])
+        }
+      }
 
       setMessageSuccess(true)
       setNewMessage("")
       toast.success("Your anonymous message has been shared")
 
-      // Auto-close after 2 seconds
       setTimeout(() => {
         setSelectedSongForMessage(null)
         setMessageSuccess(false)
@@ -831,12 +899,14 @@ export default function VibraApp() {
 
   const handleShare = async (song: Song) => {
     try {
+      const shareData = {
+        title: song.title,
+        text: `Check out this song: ${song.title} by ${song.artist}`,
+        url: song.externalUrl || window.location.href,
+      }
+
       if (navigator.share) {
-        await navigator.share({
-          title: song.title,
-          text: `Check out this song: ${song.title} by ${song.artist}`,
-          url: song.externalUrl || window.location.href,
-        })
+        await navigator.share(shareData)
         toast.success('Shared successfully')
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(
@@ -844,7 +914,6 @@ export default function VibraApp() {
         )
         toast.success('Link copied to clipboard!')
       } else {
-        // Fallback for browsers that don't support either API
         const textArea = document.createElement('textarea')
         textArea.value = `${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`
         document.body.appendChild(textArea)
@@ -855,7 +924,9 @@ export default function VibraApp() {
       }
     } catch (error) {
       console.error('Error sharing:', error)
-      toast.error('Failed to share')
+      if (error instanceof DOMException && error.name !== 'AbortError') {
+        toast.error('Failed to share')
+      }
     }
   }
 
@@ -875,15 +946,65 @@ export default function VibraApp() {
       setCurrentAudio(null)
     }
 
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current)
+      progressInterval.current = null
+    }
+
     if (song.audioUrl) {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
+      
+      // Start progress tracking
+      progressInterval.current = setInterval(() => {
+        if (audio.duration) {
+          const progress = (audio.currentTime / audio.duration) * 100
+          setPlaybackProgress(progress)
+          setCurrentTime(audio.currentTime)
+        }
+      }, 1000)
+
       audio
         .play()
         .then(() => {
           setCurrentAudio(audio)
           setCurrentlyPlaying(song.id)
-          toast.success(`Now playing: ${song.title}`)
+          
+          // Show custom now playing toast
+          toast.custom((t) => (
+            <div className="w-full max-w-md p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <img
+                  src={song.coverUrl || "/placeholder.svg"}
+                  alt={song.title}
+                  className="w-12 h-12 rounded object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold truncate">{song.title}</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{song.artist}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    audio.pause()
+                    toast.dismiss(t)
+                  }}
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="mt-3 space-y-1">
+                <Progress value={playbackProgress} className="h-2" />
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <span>{formatDuration(currentTime)}</span>
+                  <span>{formatDuration(song.duration)}</span>
+                </div>
+              </div>
+            </div>
+          ), {
+            duration: Infinity,
+          })
         })
         .catch((error) => {
           console.error("Error playing audio:", error)
@@ -891,6 +1012,10 @@ export default function VibraApp() {
         })
 
       audio.onended = () => {
+        if (progressInterval.current) {
+          clearInterval(progressInterval.current)
+          progressInterval.current = null
+        }
         handleSongEnd()
       }
     } else {
@@ -1000,9 +1125,13 @@ export default function VibraApp() {
 
   // Filter songs based on search and mood
   const filteredSongs = songs.filter((song) => {
+    const lowerQuery = searchQuery.toLowerCase()
     const matchesSearch =
-      song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      song.artist.toLowerCase().includes(searchQuery.toLowerCase())
+      song.title.toLowerCase().includes(lowerQuery) ||
+      song.artist.toLowerCase().includes(lowerQuery) ||
+      song.messages.some(message => 
+        message.content.toLowerCase().includes(lowerQuery)
+      )
     const matchesMood = !selectedMood || song.mood.includes(selectedMood)
     return matchesSearch && matchesMood
   })
@@ -1010,29 +1139,17 @@ export default function VibraApp() {
   // Format duration
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
+    const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
   // Get mood filter buttons
   const moodFilters = [
     { key: "love", label: "Love & Romance", icon: "💕" },
-    { key: "joy", label: "Joy & Happiness", icon: "😊" },
+    { key: "joy", label: "Happy & Joyful", icon: "😊" },
+    { key: "melancholy", label: "Sad & Melancholic", icon: "😔" },
     { key: "energetic", label: "Energetic", icon: "⚡" },
-    { key: "peaceful", label: "Peaceful", icon: "🕊️" },
-    { key: "nostalgia", label: "Nostalgia", icon: "🌅" },
-    { key: "empowerment", label: "Empowerment", icon: "💪" },
-    { key: "contemplative", label: "Contemplative", icon: "🤔" },
-    { key: "melancholy", label: "Melancholy", icon: "😔" },
-    { key: "upbeat", label: "Upbeat", icon: "🎉" },
-    { key: "romantic", label: "Romantic", icon: "🌹" },
-    { key: "epic", label: "Epic", icon: "🏛️" },
-    { key: "dramatic", label: "Dramatic", icon: "🎭" },
-    { key: "introspective", label: "Introspective", icon: "🧠" },
-    { key: "lonely", label: "Lonely", icon: "🌌" },
-    { key: "tender", label: "Tender", icon: "💝" },
-    { key: "celebration", label: "Celebration", icon: "🎊" },
-    { key: "motivational", label: "Motivational", icon: "🔥" },
+    { key: "peaceful", label: "Peaceful", icon: "☮️" },
   ]
 
   return (
@@ -1762,15 +1879,9 @@ export default function VibraApp() {
                                 <DialogDescription>Anonymous messages from the community</DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 mt-4">
-                                {song.messages.length === 0 ? (
-                                  <div className="text-center py-8">
-                                    <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                    <p className="text-gray-600 dark:text-gray-300">
-                                      No messages yet. Be the first to share your thoughts!
-                                    </p>
-                                  </div>
-                                ) : (
-                                  song.messages.map((message) => (
+                                {allMessages
+                                  .filter(msg => msg.songId === song.id)
+                                  .map(message => (
                                     <div key={message.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                       <p className="text-gray-900 dark:text-gray-100 mb-2">{message.content}</p>
                                       <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
@@ -1799,6 +1910,14 @@ export default function VibraApp() {
                                       </div>
                                     </div>
                                   ))
+                                }
+                                {allMessages.filter(msg => msg.songId === song.id).length === 0 && (
+                                  <div className="text-center py-8">
+                                    <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                    <p className="text-gray-600 dark:text-gray-300">
+                                      No messages yet. Be the first to share your thoughts!
+                                    </p>
+                                  </div>
                                 )}
                               </div>
                             </DialogContent>
@@ -2018,4 +2137,4 @@ export default function VibraApp() {
       </footer>
     </div>
   )
-}
+} 
