@@ -1188,10 +1188,7 @@ export default function VibraApp() {
   // Get mood filter buttons
   const moodFilters = [
     { key: "love", label: "Love & Romance", icon: "💕" },
-    { key: "joy", label: "Happy & Joyful", icon: "😊" },
-    { key: "melancholy", label: "Sad & Melancholic", icon: "😢" },
-    { key: "energetic", label: "Energetic", icon: "⚡" },
-    { key: "peaceful", label: "Peaceful", icon: "☮️" },
+  
   ]
 
   return (
