@@ -45,7 +45,6 @@ import {
   Filter,
   User,
   Trash2,
-  Share2,
   Menu,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -240,14 +239,16 @@ export default function VibraApp() {
 
   // Load messages from Firebase
   useEffect(() => {
-    const messagesRef = collection(db, "messages")
-    const q = query(messagesRef, orderBy("timestamp", "desc"))
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages: AnonymousMessage[] = []
-      snapshot.forEach((doc) => {
-        const data = doc.data()
-        messages.push({
+    const loadMessages = async () => {
+      const messagesRef = collection(db, "messages");
+      const q = query(messagesRef, orderBy("timestamp", "desc"));
+      
+      const querySnapshot = await getDocs(q);
+      const initialMessages: AnonymousMessage[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        initialMessages.push({
           id: doc.id,
           content: data.content,
           emotion: data.emotion,
@@ -255,20 +256,49 @@ export default function VibraApp() {
           likes: data.likes || 0,
           songId: data.songId,
           likedBy: data.likedBy || []
-        } as AnonymousMessage)
-      })
-      setAllMessages(messages)
+        });
+      });
 
-      // Update songs with messages
-      setSongs((prevSongs) =>
-        prevSongs.map((song) => ({
+      setAllMessages(initialMessages);
+      associateMessagesWithSongs(initialMessages);
+      
+      // Then set up real-time listener
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const updatedMessages: AnonymousMessage[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          updatedMessages.push({
+            id: doc.id,
+            content: data.content,
+            emotion: data.emotion,
+            timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
+            likes: data.likes || 0,
+            songId: data.songId,
+            likedBy: data.likedBy || []
+          });
+        });
+        setAllMessages(updatedMessages);
+        associateMessagesWithSongs(updatedMessages);
+      });
+
+      return () => unsubscribe();
+    };
+
+    const associateMessagesWithSongs = (messages: AnonymousMessage[]) => {
+      setSongs(prevSongs => 
+        prevSongs.map(song => ({
           ...song,
-          messages: messages.filter((msg) => msg.songId === song.id),
-        })),
-      )
-    })
+          messages: messages.filter(msg => msg.songId === song.id),
+        }))
+      );
+    };
 
-    return () => unsubscribe()
+    loadMessages();
+  }, []);
+
+  // Load initial songs on component mount
+  useEffect(() => {
+    loadInitialSongs()
   }, [])
   // Update your useEffect for loading messages
 useEffect(() => {
@@ -328,11 +358,6 @@ useEffect(() => {
 
   loadMessages();
 }, []);
-
-  // Load initial songs on component mount
-  useEffect(() => {
-    loadInitialSongs()
-  }, [])
 
   // Function to assign mood based on song title and artist
   const assignMoodToSong = (title: string, artist: string): string[] => {
@@ -912,6 +937,14 @@ useEffect(() => {
   }
 
   const addAnonymousMessage = async (songId: string) => {
+    // Check if user is logged in
+    if (!firebaseUser) {
+      setShowSignIn(true); // Show sign-in dialog
+      setSelectedSongForMessage(null); // Close the message dialog
+      toast.info("Please sign in to share your message");
+      return;
+    }
+
     if (!newMessage.trim()) return
 
     try {
@@ -952,8 +985,9 @@ useEffect(() => {
 
   const likeMessage = async (messageId: string) => {
     if (!firebaseUser) {
-      toast.error("Please sign in to like messages")
-      return
+      setShowSignIn(true);
+      toast.info("Please sign in to like messages");
+      return;
     }
 
     try {
@@ -977,30 +1011,6 @@ useEffect(() => {
     } catch (error) {
       console.error("Error liking message:", error)
       toast.error("Failed to like message")
-    }
-  }
-
-  const handleShare = async (song: Song) => {
-    try {
-      const shareData = {
-        title: song.title,
-        text: `Check out this song: ${song.title} by ${song.artist}`,
-        url: song.externalUrl || window.location.href,
-      }
-
-      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-        await navigator.share(shareData)
-      } else {
-        // Fallback for browsers that don't support the Web Share API
-        const shareUrl = song.externalUrl || window.location.href
-        await navigator.clipboard.writeText(`${song.title} by ${song.artist} - ${shareUrl}`)
-        toast.success('Link copied to clipboard!')
-      }
-    } catch (error) {
-      console.error('Error sharing:', error)
-      if (error instanceof Error && error.name !== 'AbortError') {
-        toast.error('Failed to share')
-      }
     }
   }
 
@@ -1220,7 +1230,10 @@ useEffect(() => {
   // Get mood filter buttons
   const moodFilters = [
     { key: "love", label: "Love & Romance", icon: "💕" },
-   
+    { key: "joy", label: "Happy & Joyful", icon: "😊" },
+    { key: "melancholy", label: "Sad & Melancholic", icon: "😢" },
+    { key: "energetic", label: "Energetic", icon: "⚡" },
+    { key: "peaceful", label: "Peaceful", icon: "☮️" },
   ]
 
   return (
@@ -1845,14 +1858,6 @@ useEffect(() => {
                               <ExternalLink className="h-3 w-3" />
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-6 w-6 p-0"
-                            onClick={() => handleShare(song)}
-                          >
-                            <Share2 className="h-3 w-3" />
-                          </Button>
                         </div>
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                           <Button
@@ -1971,13 +1976,12 @@ useEffect(() => {
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          onClick={() => firebaseUser ? likeMessage(message.id) : null}
+                                          onClick={() => likeMessage(message.id)}
                                           className={`flex items-center gap-1 ${
                                             firebaseUser && message.likedBy.includes(firebaseUser.uid) 
                                               ? "text-red-500" 
                                               : "hover:text-red-500"
                                           }`}
-                                          disabled={!firebaseUser}
                                         >
                                           <Heart className="h-4 w-4" />
                                           <span>{message.likes}</span>
@@ -1999,12 +2003,26 @@ useEffect(() => {
 
                           <Dialog
                             open={selectedSongForMessage === song.id}
-                            onOpenChange={(open) => setSelectedSongForMessage(open ? song.id : null)}
+                            onOpenChange={(open) => {
+                              if (!firebaseUser && open) {
+                                setShowSignIn(true);
+                                toast.info("Please sign in to share your message");
+                                return;
+                              }
+                              setSelectedSongForMessage(open ? song.id : null);
+                            }}
                           >
                             <DialogTrigger asChild>
                               <Button
                                 size="sm"
                                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                onClick={(e) => {
+                                  if (!firebaseUser) {
+                                    e.preventDefault();
+                                    setShowSignIn(true);
+                                    toast.info("Please sign in to share your message");
+                                  }
+                                }}
                               >
                                 <MessageCircle className="h-4 w-4 mr-1" />
                                 Send
@@ -2131,14 +2149,6 @@ useEffect(() => {
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 w-8 p-0"
-                          onClick={() => handleShare(song)}
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     </div>
                   )}
