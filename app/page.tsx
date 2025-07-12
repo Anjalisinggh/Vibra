@@ -270,6 +270,64 @@ export default function VibraApp() {
 
     return () => unsubscribe()
   }, [])
+  // Update your useEffect for loading messages
+useEffect(() => {
+  const loadMessages = async () => {
+    const messagesRef = collection(db, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "desc"));
+    
+    const querySnapshot = await getDocs(q);
+    const initialMessages: AnonymousMessage[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      initialMessages.push({
+        id: doc.id,
+        content: data.content,
+        emotion: data.emotion,
+        timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
+        likes: data.likes || 0,
+        songId: data.songId,
+        likedBy: data.likedBy || []
+      });
+    });
+
+    setAllMessages(initialMessages);
+    associateMessagesWithSongs(initialMessages);
+    
+    // Then set up real-time listener
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const updatedMessages: AnonymousMessage[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        updatedMessages.push({
+          id: doc.id,
+          content: data.content,
+          emotion: data.emotion,
+          timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
+          likes: data.likes || 0,
+          songId: data.songId,
+          likedBy: data.likedBy || []
+        });
+      });
+      setAllMessages(updatedMessages);
+      associateMessagesWithSongs(updatedMessages);
+    });
+
+    return () => unsubscribe();
+  };
+
+  const associateMessagesWithSongs = (messages: AnonymousMessage[]) => {
+    setSongs(prevSongs => 
+      prevSongs.map(song => ({
+        ...song,
+        messages: messages.filter(msg => msg.songId === song.id),
+      }))
+    );
+  };
+
+  loadMessages();
+}, []);
 
   // Load initial songs on component mount
   useEffect(() => {
