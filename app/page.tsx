@@ -72,6 +72,7 @@ import {
   onSnapshot,
   serverTimestamp,
   deleteDoc,
+  arrayUnion,
 } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 
@@ -103,6 +104,7 @@ interface AnonymousMessage {
   timestamp: any
   likes: number
   songId: string
+  likedBy: string[] // Track who liked the message
 }
 
 interface Playlist {
@@ -247,8 +249,12 @@ export default function VibraApp() {
         const data = doc.data()
         messages.push({
           id: doc.id,
-          ...data,
+          content: data.content,
+          emotion: data.emotion,
           timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
+          likes: data.likes || 0,
+          songId: data.songId,
+          likedBy: data.likedBy || []
         } as AnonymousMessage)
       })
       setAllMessages(messages)
@@ -858,6 +864,7 @@ export default function VibraApp() {
         timestamp: serverTimestamp(),
         likes: 0,
         songId: songId,
+        likedBy: []
       }
 
       await addDoc(collection(db, "messages"), messageData)
@@ -885,11 +892,29 @@ export default function VibraApp() {
     }
   }
 
-  const likeMessage = async (songId: string, messageId: string) => {
+  const likeMessage = async (messageId: string) => {
+    if (!firebaseUser) {
+      toast.error("Please sign in to like messages")
+      return
+    }
+
     try {
-      await updateDoc(doc(db, "messages", messageId), {
+      const messageRef = doc(db, "messages", messageId)
+      const message = allMessages.find(m => m.id === messageId)
+      
+      if (!message) return
+
+      // Check if user already liked this message
+      if (message.likedBy.includes(firebaseUser.uid)) {
+        toast.info("You've already liked this message")
+        return
+      }
+
+      await updateDoc(messageRef, {
         likes: increment(1),
+        likedBy: arrayUnion(firebaseUser.uid)
       })
+
       toast.success("Message liked")
     } catch (error) {
       console.error("Error liking message:", error)
@@ -905,26 +930,17 @@ export default function VibraApp() {
         url: song.externalUrl || window.location.href,
       }
 
-      if (navigator.share) {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData)
-        toast.success('Shared successfully')
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(
-          `${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`
-        )
-        toast.success('Link copied to clipboard!')
       } else {
-        const textArea = document.createElement('textarea')
-        textArea.value = `${song.title} by ${song.artist} - ${song.externalUrl || window.location.href}`
-        document.body.appendChild(textArea)
-        textArea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textArea)
+        // Fallback for browsers that don't support the Web Share API
+        const shareUrl = song.externalUrl || window.location.href
+        await navigator.clipboard.writeText(`${song.title} by ${song.artist} - ${shareUrl}`)
         toast.success('Link copied to clipboard!')
       }
     } catch (error) {
       console.error('Error sharing:', error)
-      if (error instanceof DOMException && error.name !== 'AbortError') {
+      if (error instanceof Error && error.name !== 'AbortError') {
         toast.error('Failed to share')
       }
     }
@@ -1879,9 +1895,8 @@ export default function VibraApp() {
                                 <DialogDescription>Anonymous messages from the community</DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 mt-4">
-                                {allMessages
-                                  .filter(msg => msg.songId === song.id)
-                                  .map(message => (
+                                {song.messages.length > 0 ? (
+                                  song.messages.map(message => (
                                     <div key={message.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                       <p className="text-gray-900 dark:text-gray-100 mb-2">{message.content}</p>
                                       <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
@@ -1901,8 +1916,13 @@ export default function VibraApp() {
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          onClick={() => likeMessage(song.id, message.id)}
-                                          className="flex items-center gap-1 hover:text-red-500"
+                                          onClick={() => firebaseUser ? likeMessage(message.id) : null}
+                                          className={`flex items-center gap-1 ${
+                                            firebaseUser && message.likedBy.includes(firebaseUser.uid) 
+                                              ? "text-red-500" 
+                                              : "hover:text-red-500"
+                                          }`}
+                                          disabled={!firebaseUser}
                                         >
                                           <Heart className="h-4 w-4" />
                                           <span>{message.likes}</span>
@@ -1910,8 +1930,7 @@ export default function VibraApp() {
                                       </div>
                                     </div>
                                   ))
-                                }
-                                {allMessages.filter(msg => msg.songId === song.id).length === 0 && (
+                                ) : (
                                   <div className="text-center py-8">
                                     <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                     <p className="text-gray-600 dark:text-gray-300">
@@ -2137,4 +2156,4 @@ export default function VibraApp() {
       </footer>
     </div>
   )
-} 
+}
