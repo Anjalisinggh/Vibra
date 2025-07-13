@@ -2162,18 +2162,34 @@ export default function VibraApp() {
 
       <Toaster richColors position="top-center" />
       
-      <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-3 px-4 mt-16">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-center md:text-left">
-            <h2 className="text-2xl font-bold text-pink-200">Vibra</h2>
-            <p className="text-sm text-pink-100 mt-1">Feel it. Share it. Play it.</p>
-          </div>
-
-          <div className="text-center md:text-right text-xs text-pink-200">
-            © {new Date().getFullYear()} Vibra by 🤍. All rights reserved.
-          </div>
-        </div>
-      </footer>
+     <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-2 px-4">
+  <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-1">
+    <div className="flex items-center gap-2">
+      <h2 className="text-lg font-bold text-pink-200">Vibra</h2>
+      <span className="text-xs text-pink-300">Feel it. Share it. Play it.</span>
+    </div>
+    
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-pink-200">
+      with 🤍 by Anjali
+      </span>
+      <div className="flex gap-2">
+        <a href="https://www.instagram.com/anjalisinggh_12/" target="_blank" rel="noopener noreferrer"
+          className="text-pink-200 hover:text-white transition-colors">
+          <FaInstagram className="w-3 h-3" />
+        </a>
+        <a href="https://x.com/anjalisinggh12/" target="_blank" rel="noopener noreferrer"
+          className="text-pink-200 hover:text-blue-300 transition-colors">
+          <FaTwitter className="w-3 h-3" />
+        </a>
+        <a href="https://github.com/Anjalisinggh" target="_blank" rel="noopener noreferrer"
+          className="text-pink-200 hover:text-white transition-colors">
+          <FaGithub className="w-3 h-3" />
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
     </div>
   )
 }
