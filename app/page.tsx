@@ -983,87 +983,118 @@ export default function VibraApp() {
   }
 
   const playSpecificSong = (song: Song) => {
-    if (currentAudio) {
-      currentAudio.pause()
-      setCurrentAudio(null)
-    }
+  if (currentAudio) {
+    currentAudio.pause();
+    setCurrentAudio(null);
+  }
 
-    if (progressInterval.current) {
-      clearInterval(progressInterval.current)
-      progressInterval.current = null
-    }
+  if (progressInterval.current) {
+    clearInterval(progressInterval.current);
+    progressInterval.current = null;
+  }
 
-    if (song.audioUrl) {
-      const audio = new Audio(song.audioUrl)
-      audio.crossOrigin = "anonymous"
-      
-      // Start progress tracking
-      progressInterval.current = setInterval(() => {
-        if (audio.duration) {
-          const progress = (audio.currentTime / audio.duration) * 100
-          setPlaybackProgress(progress)
-          setCurrentTime(audio.currentTime)
-        }
-      }, 1000)
+  if (song.audioUrl) {
+    const audio = new Audio(song.audioUrl);
+    audio.crossOrigin = "anonymous";
+    
+    // Set initial progress
+    setCurrentTime(0);
+    setPlaybackProgress(0);
 
-      audio
-        .play()
-        .then(() => {
-          setCurrentAudio(audio)
-          setCurrentlyPlaying(song.id)
-          
-          // Show custom now playing toast
-          toast.custom((t) => (
-            <div className="w-full max-w-md p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <img
-                  src={song.coverUrl || "/placeholder.svg"}
-                  alt={song.title}
-                  className="w-12 h-12 rounded object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold truncate">{song.title}</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{song.artist}</p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    audio.pause()
-                    toast.dismiss(t)
-                  }}
-                >
-                  <Pause className="h-4 w-4" />
-                </Button>
+    // Update progress while playing
+    const updateProgress = () => {
+      if (audio.duration) {
+        const progress = (audio.currentTime / audio.duration) * 100;
+        setPlaybackProgress(progress);
+        setCurrentTime(audio.currentTime);
+      }
+    };
+
+    progressInterval.current = setInterval(updateProgress, 1000);
+
+    // Handle seeking
+    audio.addEventListener('timeupdate', updateProgress);
+
+    audio
+      .play()
+      .then(() => {
+        setCurrentAudio(audio);
+        setCurrentlyPlaying(song.id);
+        
+        // Show custom now playing toast
+        toast.custom((t) => (
+          <div className="w-full max-w-md p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700">
+            <div className="flex items-center gap-3">
+              <img
+                src={song.coverUrl || "/placeholder.svg"}
+                alt={song.title}
+                className="w-12 h-12 rounded object-cover"
+              />
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold truncate">{song.title}</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{song.artist}</p>
               </div>
-              <div className="mt-3 space-y-1">
-                <Progress value={playbackProgress} className="h-2" />
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                  <span>{formatDuration(currentTime)}</span>
-                  <span>{formatDuration(song.duration)}</span>
-                </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  audio.pause();
+                  toast.dismiss(t);
+                }}
+              >
+                <Pause className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="relative group">
+                <Progress 
+                  value={playbackProgress} 
+                  className="h-2 cursor-pointer"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    const newTime = percent * audio.duration;
+                    audio.currentTime = newTime;
+                    setCurrentTime(newTime);
+                    setPlaybackProgress(percent * 100);
+                  }}
+                />
+                <div 
+                  className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
+                  style={{ width: `${playbackProgress}%` }}
+                />
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ left: `calc(${playbackProgress}% - 8px)` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>{formatDuration(currentTime)}</span>
+                <span>{formatDuration(song.duration)}</span>
               </div>
             </div>
-          ), {
-            duration: Infinity,
-          })
-        })
-        .catch((error) => {
-          console.error("Error playing audio:", error)
-          toast.error("Failed to play audio")
-        })
+          </div>
+        ), {
+          duration: Infinity,
+        });
+      })
+      .catch((error) => {
+        console.error("Error playing audio:", error);
+        toast.error("Failed to play audio");
+      });
 
-      audio.onended = () => {
-        if (progressInterval.current) {
-          clearInterval(progressInterval.current)
-          progressInterval.current = null
-        }
-        handleSongEnd()
+    audio.onended = () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current);
+        progressInterval.current = null;
       }
-    } else {
-      toast.error("No audio URL available for this song")
-    }
+      audio.removeEventListener('timeupdate', updateProgress);
+      handleSongEnd();
+    };
+  } else {
+    toast.error("No audio URL available for this song");
   }
+};
 
   const handleSongEnd = () => {
     if (repeatMode === "one" && currentPlaylist) {
@@ -1221,95 +1252,112 @@ export default function VibraApp() {
               {user ? (
                 <div className="flex items-center gap-2">
                   <Dialog open={showPlaylists} onOpenChange={setShowPlaylists}>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <ListMusic className="h-4 w-4" />
-                        <span className="ml-2 hidden md:inline">Playlists ({playlists.length})</span>
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between">
-                          <span>Your Playlists</span>
-                          <Button onClick={() => setShowCreatePlaylist(true)} size="sm">
-                            <Plus className="h-4 w-4 mr-1" />
-                            Create Playlist
-                          </Button>
-                        </DialogTitle>
-                        <DialogDescription>Manage your custom playlists</DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 mt-4">
-                        {playlists.length === 0 ? (
-                          <div className="text-center py-8">
-                            <ListMusic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-600 dark:text-gray-300">
-                              No playlists yet. Create your first playlist!
-                            </p>
-                          </div>
-                        ) : (
-                          playlists.map((playlist) => (
-                            <Card key={playlist.id} className="p-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <h3 className="font-semibold text-lg">{playlist.name}</h3>
-                                  <p className="text-gray-600 dark:text-gray-300 text-sm">{playlist.description}</p>
-                                  <p className="text-gray-500 text-xs mt-1">
-                                    {playlist.songs.length} songs • Created{" "}
-                                    {new Date(playlist.createdAt).toLocaleDateString()}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    onClick={() => playPlaylist(playlist)}
-                                    disabled={playlist.songs.length === 0}
-                                    size="sm"
-                                    className="bg-gradient-to-r from-purple-600 to-pink-600"
-                                  >
-                                    <PlayCircle className="h-4 w-4 mr-1" />
-                                    Play
-                                  </Button>
-                                  <Button
-                                    onClick={() => deletePlaylist(playlist.id)}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                              {playlist.songs.length > 0 && (
-                                <div className="mt-4 space-y-2">
-                                  {playlist.songs.slice(0, 3).map((song) => (
-                                    <div key={song.id} className="flex items-center gap-2 text-sm">
-                                      <img
-                                        src={song.coverUrl || "/placeholder.svg"}
-                                        alt={song.title}
-                                        className="w-8 h-8 rounded object-cover"
-                                      />
-                                      <span className="flex-1 truncate">
-                                        {song.title} - {song.artist}
-                                      </span>
-                                      <Button
-                                        onClick={() => removeFromPlaylist(song.id, playlist.id)}
-                                        variant="ghost"
-                                        size="sm"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  ))}
-                                  {playlist.songs.length > 3 && (
-                                    <p className="text-xs text-gray-500">+{playlist.songs.length - 3} more songs</p>
-                                  )}
-                                </div>
-                              )}
-                            </Card>
-                          ))
-                        )}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+  <DialogTrigger asChild>
+    <Button variant="ghost" size="sm">
+      <ListMusic className="h-4 w-4" />
+      <span className="ml-2 hidden md:inline">Playlists ({playlists.length})</span>
+    </Button>
+  </DialogTrigger>
+  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle className="flex items-center justify-between">
+        <span>Your Playlists</span>
+        <Button onClick={() => setShowCreatePlaylist(true)} size="sm">
+          <Plus className="h-4 w-4 mr-1" />
+          Create Playlist
+        </Button>
+      </DialogTitle>
+      <DialogDescription>Manage your custom playlists</DialogDescription>
+    </DialogHeader>
+    <div className="space-y-4 mt-4">
+      {playlists.length === 0 ? (
+        <div className="text-center py-8">
+          <ListMusic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-300">
+            No playlists yet. Create your first playlist!
+          </p>
+        </div>
+      ) : (
+        playlists.map((playlist) => (
+          <Card key={playlist.id} className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-lg truncate">{playlist.name}</h3>
+                <p className="text-gray-600 dark:text-gray-300 text-sm truncate">{playlist.description}</p>
+                <p className="text-gray-500 text-xs mt-1">
+                  {playlist.songs.length} songs • {formatDuration(
+                    playlist.songs.reduce((total, song) => total + song.duration, 0)
+                  )} • Created {new Date(playlist.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    playPlaylist(playlist);
+                    setShowPlaylists(false);
+                  }}
+                  disabled={playlist.songs.length === 0}
+                  size="sm"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600"
+                >
+                  <PlayCircle className="h-4 w-4 mr-1" />
+                  Play
+                </Button>
+                <Button
+                  onClick={() => deletePlaylist(playlist.id)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {playlist.songs.length > 0 && (
+              <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
+                {playlist.songs.map((song, index) => (
+                  <div 
+                    key={song.id} 
+                    className={`flex items-center gap-2 text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPlaylist?.id === playlist.id && currentSongIndex === index ? 'bg-purple-50 dark:bg-purple-900/30' : ''}`}
+                    onClick={() => {
+                      if (currentPlaylist?.id !== playlist.id) {
+                        setCurrentPlaylist(playlist);
+                      }
+                      setCurrentSongIndex(index);
+                      playSpecificSong(song);
+                    }}
+                  >
+                    <img
+                      src={song.coverUrl || "/placeholder.svg"}
+                      alt={song.title}
+                      className="w-8 h-8 rounded object-cover"
+                    />
+                    <span className="flex-1 truncate">
+                      {song.title} - {song.artist}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {formatDuration(song.duration)}
+                    </span>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromPlaylist(song.id, playlist.id);
+                      }}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        ))
+      )}
+    </div>
+  </DialogContent>
+</Dialog>
 
                   <Dialog open={showProfile} onOpenChange={setShowProfile}>
                     <DialogTrigger asChild>
@@ -1648,53 +1696,147 @@ export default function VibraApp() {
       </header>
 
       {/* Now Playing Bar */}
-      {currentlyPlaying && currentPlaylist && (
-        <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
-          <div className="container mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img
-                src={currentPlaylist.songs[currentSongIndex]?.coverUrl || "/placeholder.svg"}
-                alt="Now playing"
-                className="w-12 h-12 rounded object-cover"
-              />
-              <div>
-                <h4 className="font-semibold text-sm">{currentPlaylist.songs[currentSongIndex]?.title}</h4>
-                <p className="text-xs text-gray-600 dark:text-gray-300">
-                  {currentPlaylist.songs[currentSongIndex]?.artist}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={playPrevious}>
-                <SkipBack className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => togglePlayback(currentPlaylist.songs[currentSongIndex])}>
-                {currentlyPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={playNext}>
-                <SkipForward className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={toggleRepeat}>
-                <Repeat
-                  className={`h-4 w-4 ${
-                    repeatMode !== "none" ? "text-purple-600" : ""
-                  } ${repeatMode === "one" ? "relative" : ""}`}
-                />
-                {repeatMode === "one" && (
-                  <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                    1
-                  </span>
-                )}
-              </Button>
-            </div>
-
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              {currentSongIndex + 1} / {currentPlaylist.songs.length} • {currentPlaylist.name}
-            </div>
+{currentlyPlaying && currentPlaylist && (
+  <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
+    <div className="container mx-auto">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <img
+            src={currentPlaylist.songs[currentSongIndex]?.coverUrl || "/placeholder.svg"}
+            alt="Now playing"
+            className="w-12 h-12 rounded object-cover"
+          />
+          <div className="min-w-0">
+            <h4 className="font-semibold text-sm truncate">{currentPlaylist.songs[currentSongIndex]?.title}</h4>
+            <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
+              {currentPlaylist.songs[currentSongIndex]?.artist}
+            </p>
           </div>
         </div>
-      )}
+
+        <div className="flex-1 max-w-md">
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="ghost" size="sm" onClick={playPrevious}>
+              <SkipBack className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => togglePlayback(currentPlaylist.songs[currentSongIndex])}
+            >
+              {currentlyPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={playNext}>
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Seekable Progress Bar */}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
+              {formatDuration(currentTime)}
+            </span>
+            <div className="flex-1 relative group">
+              <Progress 
+                value={playbackProgress} 
+                className="h-2 cursor-pointer"
+                onClick={(e) => {
+                  if (currentAudio) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const percent = (e.clientX - rect.left) / rect.width;
+                    const newTime = percent * currentAudio.duration;
+                    currentAudio.currentTime = newTime;
+                    setCurrentTime(newTime);
+                    setPlaybackProgress(percent * 100);
+                  }
+                }}
+              />
+              <div 
+                className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
+                style={{ width: `${playbackProgress}%` }}
+              />
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ left: `calc(${playbackProgress}% - 8px)` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
+              {formatDuration(currentPlaylist.songs[currentSongIndex]?.duration || 0)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-1 justify-end">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={toggleRepeat}
+            className={repeatMode !== "none" ? "text-purple-600" : ""}
+          >
+            <Repeat className="h-4 w-4" />
+            {repeatMode === "one" && (
+              <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                1
+              </span>
+            )}
+          </Button>
+          <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
+            {currentSongIndex + 1} / {currentPlaylist.songs.length}
+          </span>
+          
+          {/* Playlist Dropdown */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ListMusic className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Playlist: {currentPlaylist.name}</DialogTitle>
+                <DialogDescription>
+                  {currentPlaylist.songs.length} songs • {formatDuration(
+                    currentPlaylist.songs.reduce((total, song) => total + song.duration, 0)
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[60vh] overflow-y-auto space-y-2 mt-4">
+                {currentPlaylist.songs.map((song, index) => (
+                  <div 
+                    key={song.id} 
+                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${index === currentSongIndex ? 'bg-purple-50 dark:bg-purple-900/30' : ''}`}
+                    onClick={() => {
+                      setCurrentSongIndex(index);
+                      playSpecificSong(song);
+                    }}
+                  >
+                    <img
+                      src={song.coverUrl || "/placeholder.svg"}
+                      alt={song.title}
+                      className="w-10 h-10 rounded object-cover"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm truncate">{song.title}</h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{song.artist}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">
+                        {formatDuration(song.duration)}
+                      </span>
+                      {index === currentSongIndex && (
+                        <Volume2 className="h-4 w-4 text-purple-600" />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
@@ -2171,7 +2313,7 @@ export default function VibraApp() {
     
     <div className="flex items-center gap-3">
       <span className="text-xs text-pink-200">
-      with 🤍 by Anjali
+      with 🤍 by Anjali 
       </span>
       <div className="flex gap-2">
         <a href="https://www.instagram.com/anjalisinggh_12/" target="_blank" rel="noopener noreferrer"
