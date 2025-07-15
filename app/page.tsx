@@ -1,13 +1,30 @@
-"use client"
-import { FaInstagram, FaTwitter, FaGithub } from "react-icons/fa"
-import type React from "react"
-import { useState, useEffect, useRef } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import Link from "next/link"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+"use client";
+import { FaInstagram, FaTwitter, FaGithub } from "react-icons/fa";
+import type React from "react";
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import Link from "next/link";
+import { 
+  MoreHorizontal, 
+  Download,
+  PlusCircle,
+  
+} from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 import {
   Music,
   Heart,
@@ -46,9 +63,9 @@ import {
   User,
   Trash2,
   Menu,
-} from "lucide-react"
-import { toast } from "sonner"
-import { Progress } from "@/components/ui/progress"
+} from "lucide-react";
+import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 // Firebase imports
 import {
@@ -57,7 +74,7 @@ import {
   signOut,
   onAuthStateChanged,
   type User as FirebaseUser,
-} from "firebase/auth"
+} from "firebase/auth";
 import {
   collection,
   addDoc,
@@ -72,170 +89,303 @@ import {
   serverTimestamp,
   deleteDoc,
   arrayUnion,
-} from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+} from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 // Router import
-import { useRouter } from "next/navigation"
-import { Toaster } from "@/components/ui/sonner"
+import { useRouter } from "next/navigation";
+import { Toaster } from "@/components/ui/sonner";
 
 interface Song {
-  id: string
-  title: string
-  artist: string
-  mood: string[]
-  emotion: string
-  coverUrl: string
-  audioUrl: string
-  previewUrl: string
-  externalUrl: string
-  messages: AnonymousMessage[]
-  plays: number
-  duration: number
-  source: "saavn"
-  primaryArtists?: string
+  id: string;
+  title: string;
+  artist: string;
+  mood: string[];
+  emotion: string;
+  coverUrl: string;
+  audioUrl: string;
+  previewUrl: string;
+  externalUrl: string;
+  messages: AnonymousMessage[];
+  plays: number;
+  duration: number;
+  source: "saavn";
+  primaryArtists?: string;
 }
 
 interface AnonymousMessage {
-  id: string
-  content: string
-  emotion: string
-  timestamp: any
-  likes: number
-  songId: string
-  likedBy: string[] // Track who liked the message
+  id: string;
+  content: string;
+  emotion: string;
+  timestamp: any;
+  likes: number;
+  songId: string;
+  likedBy: string[]; // Track who liked the message
 }
 
 interface Playlist {
-  id: string
-  name: string
-  description: string
-  songs: Song[]
-  createdAt: string
-  isPublic: boolean
-  userId: string
-  firebaseId?: string
+  id: string;
+  name: string;
+  description: string;
+  songs: Song[];
+  createdAt: string;
+  isPublic: boolean;
+  userId: string;
+  firebaseId?: string;
 }
 
 const moodColors = {
   joy: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
   love: "bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-300",
-  anxiety: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300",
-  melancholy: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
-  nostalgia: "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
-  upbeat: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
+  anxiety:
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300",
+  melancholy:
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
+  nostalgia:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
+  upbeat:
+    "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
   romantic: "bg-rose-100 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300",
-  contemplative: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300",
+  contemplative:
+    "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300",
   epic: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300",
   dramatic: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300",
-  cathartic: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300",
-  introspective: "bg-slate-100 text-slate-800 dark:bg-slate-900/20 dark:text-slate-300",
+  cathartic:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300",
+  introspective:
+    "bg-slate-100 text-slate-800 dark:bg-slate-900/20 dark:text-slate-300",
   lonely: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
-  empowerment: "bg-violet-100 text-violet-800 dark:bg-violet-900/20 dark:text-violet-300",
+  empowerment:
+    "bg-violet-100 text-violet-800 dark:bg-violet-900/20 dark:text-violet-300",
   tender: "bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-300",
-  celebration: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
-  loneliness: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
-  energetic: "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300",
-  peaceful: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
-  motivational: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
+  celebration:
+    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
+  loneliness:
+    "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
+  energetic:
+    "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300",
+  peaceful:
+    "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300",
+  motivational:
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
   edgy: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
-}
+};
 
 // Mood-based search queries
 const moodQueries = {
-  joy: ["happy songs", "upbeat music", "feel good songs", "celebration", "cheerful music"],
-  love: ["love songs", "romantic music", "valentine songs", "couple songs", "romance"],
-  anxiety: ["calm music", "relaxing songs", "stress relief", "meditation music", "peaceful"],
-  melancholy: ["melancholic songs", "indie music", "slow songs", "contemplative", "moody"],
-  nostalgia: ["nostalgic songs", "throwback music", "memories", "old songs", "vintage"],
-  upbeat: ["energetic songs", "dance music", "party songs", "workout music", "pump up"],
-  romantic: ["romantic ballads", "love duets", "wedding songs", "intimate music", "serenade"],
-  contemplative: ["thoughtful music", "philosophical songs", "deep lyrics", "introspective", "reflective"],
-  epic: ["epic music", "cinematic songs", "powerful anthems", "grand music", "orchestral"],
-  dramatic: ["dramatic songs", "theatrical music", "intense ballads", "emotional", "powerful"],
-  cathartic: ["cathartic music", "release songs", "healing music", "therapeutic", "cleansing"],
-  introspective: ["introspective songs", "self reflection", "deep thoughts", "soul searching", "mindful"],
-  lonely: ["lonely songs", "solitude music", "alone time", "isolation", "solitary"],
-  empowerment: ["empowering songs", "motivational music", "confidence boost", "strong", "inspiring"],
+  joy: [
+    "happy songs",
+    "upbeat music",
+    "feel good songs",
+    "celebration",
+    "cheerful music",
+  ],
+  love: [
+    "love songs",
+    "romantic music",
+    "valentine songs",
+    "couple songs",
+    "romance",
+  ],
+  anxiety: [
+    "calm music",
+    "relaxing songs",
+    "stress relief",
+    "meditation music",
+    "peaceful",
+  ],
+  melancholy: [
+    "melancholic songs",
+    "indie music",
+    "slow songs",
+    "contemplative",
+    "moody",
+  ],
+  nostalgia: [
+    "nostalgic songs",
+    "throwback music",
+    "memories",
+    "old songs",
+    "vintage",
+  ],
+  upbeat: [
+    "energetic songs",
+    "dance music",
+    "party songs",
+    "workout music",
+    "pump up",
+  ],
+  romantic: [
+    "romantic ballads",
+    "love duets",
+    "wedding songs",
+    "intimate music",
+    "serenade",
+  ],
+  contemplative: [
+    "thoughtful music",
+    "philosophical songs",
+    "deep lyrics",
+    "introspective",
+    "reflective",
+  ],
+  epic: [
+    "epic music",
+    "cinematic songs",
+    "powerful anthems",
+    "grand music",
+    "orchestral",
+  ],
+  dramatic: [
+    "dramatic songs",
+    "theatrical music",
+    "intense ballads",
+    "emotional",
+    "powerful",
+  ],
+  cathartic: [
+    "cathartic music",
+    "release songs",
+    "healing music",
+    "therapeutic",
+    "cleansing",
+  ],
+  introspective: [
+    "introspective songs",
+    "self reflection",
+    "deep thoughts",
+    "soul searching",
+    "mindful",
+  ],
+  lonely: [
+    "lonely songs",
+    "solitude music",
+    "alone time",
+    "isolation",
+    "solitary",
+  ],
+  empowerment: [
+    "empowering songs",
+    "motivational music",
+    "confidence boost",
+    "strong",
+    "inspiring",
+  ],
   tender: ["tender songs", "gentle music", "soft ballads", "caring", "sweet"],
-  celebration: ["celebration songs", "victory music", "achievement", "success", "triumph"],
-  loneliness: ["loneliness songs", "empty feeling", "missing someone", "solitary", "isolated"],
-  energetic: ["high energy", "pump up songs", "adrenaline", "intense", "dynamic"],
+  celebration: [
+    "celebration songs",
+    "victory music",
+    "achievement",
+    "success",
+    "triumph",
+  ],
+  loneliness: [
+    "loneliness songs",
+    "empty feeling",
+    "missing someone",
+    "solitary",
+    "isolated",
+  ],
+  energetic: [
+    "high energy",
+    "pump up songs",
+    "adrenaline",
+    "intense",
+    "dynamic",
+  ],
   peaceful: ["peaceful music", "serene songs", "tranquil", "harmony", "zen"],
-  motivational: ["motivational songs", "inspiration", "never give up", "determination", "drive"],
-}
+  motivational: [
+    "motivational songs",
+    "inspiration",
+    "never give up",
+    "determination",
+    "drive",
+  ],
+};
 
 interface AppUser {
-  id: string
-  name: string
-  email: string
+  id: string;
+  name: string;
+  email: string;
 }
 
 export default function VibraApp() {
-  const [isDarkMode, setIsDarkMode] = useState(false)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedMood, setSelectedMood] = useState<string>("")
-  const [songs, setSongs] = useState<Song[]>([])
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
-  const [newMessage, setNewMessage] = useState("")
-  const [selectedSongForMessage, setSelectedSongForMessage] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
-  const [showProfile, setShowProfile] = useState(false)
-  const [playlists, setPlaylists] = useState<Playlist[]>([])
-  const [currentPlaylist, setCurrentPlaylist] = useState<Playlist | null>(null)
-  const [currentSongIndex, setCurrentSongIndex] = useState(0)
-  const [isShuffled, setIsShuffled] = useState(false)
-  const [repeatMode, setRepeatMode] = useState<"none" | "one" | "all">("none")
-  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false)
-  const [showPlaylists, setShowPlaylists] = useState(false)
-  const [newPlaylistName, setNewPlaylistName] = useState("")
-  const [newPlaylistDescription, setNewPlaylistDescription] = useState("")
-  const [user, setUser] = useState<AppUser | null>(null)
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null)
-  const [showSignIn, setShowSignIn] = useState(false)
-  const [showSignUp, setShowSignUp] = useState(false)
-  const [signInData, setSignInData] = useState({ email: "", password: "" })
-  const [signUpData, setSignUpData] = useState({ name: "", email: "", password: "", confirmPassword: "" })
-  const [authLoading, setAuthLoading] = useState(false)
-  const [allMessages, setAllMessages] = useState<AnonymousMessage[]>([])
-  const [messageSuccess, setMessageSuccess] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [playbackProgress, setPlaybackProgress] = useState(0)
-  const [currentTime, setCurrentTime] = useState(0)
-  const progressInterval = useRef<NodeJS.Timeout | null>(null)
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedMood, setSelectedMood] = useState<string>("");
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const [selectedSongForMessage, setSelectedSongForMessage] = useState<
+    string | null
+  >(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(
+    null
+  );
+  const [showProfile, setShowProfile] = useState(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [currentPlaylist, setCurrentPlaylist] = useState<Playlist | null>(null);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<"none" | "one" | "all">("none");
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [showPlaylists, setShowPlaylists] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [showSignIn, setShowSignIn] = useState(false);
+  const [showSignUp, setShowSignUp] = useState(false);
+  const [signInData, setSignInData] = useState({ email: "", password: "" });
+  const [signUpData, setSignUpData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [allMessages, setAllMessages] = useState<AnonymousMessage[]>([]);
+  const [messageSuccess, setMessageSuccess] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const progressInterval = useRef<NodeJS.Timeout | null>(null);
 
-  const router = useRouter()
+  const router = useRouter();
 
   // Toggle dark mode
   useEffect(() => {
     if (isDarkMode) {
-      document.documentElement.classList.add("dark")
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove("dark")
+      document.documentElement.classList.remove("dark");
     }
-  }, [isDarkMode])
+  }, [isDarkMode]);
 
   // Firebase Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setFirebaseUser(firebaseUser)
+      setFirebaseUser(firebaseUser);
       if (firebaseUser) {
         setUser({
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "User",
+          name:
+            firebaseUser.displayName ||
+            firebaseUser.email?.split("@")[0] ||
+            "User",
           email: firebaseUser.email || "",
-        })
-        loadUserPlaylists(firebaseUser.uid)
+        });
+        loadUserPlaylists(firebaseUser.uid);
       } else {
-        setUser(null)
-        setPlaylists([])
+        setUser(null);
+        setPlaylists([]);
       }
-    })
+    });
 
-    return () => unsubscribe()
-  }, [])
+    return () => unsubscribe();
+  }, []);
 
   // Combined data loading function
   const loadInitialData = async () => {
@@ -243,12 +393,12 @@ export default function VibraApp() {
     try {
       // 1. First load songs
       const initialSongs = await loadInitialSongs();
-      
+
       // 2. Then load messages
       const messagesRef = collection(db, "messages");
       const q = query(messagesRef, orderBy("timestamp", "desc"));
       const querySnapshot = await getDocs(q);
-      
+
       const initialMessages: AnonymousMessage[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -259,19 +409,19 @@ export default function VibraApp() {
           timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
           likes: data.likes || 0,
           songId: data.songId,
-          likedBy: data.likedBy || []
+          likedBy: data.likedBy || [],
         });
       });
 
       // 3. Associate messages with songs before setting state
-      const songsWithMessages = initialSongs.map(song => ({
+      const songsWithMessages = initialSongs.map((song) => ({
         ...song,
-        messages: initialMessages.filter(msg => msg.songId === song.id),
+        messages: initialMessages.filter((msg) => msg.songId === song.id),
       }));
 
       setSongs(songsWithMessages);
       setAllMessages(initialMessages);
-      
+
       // 4. Set up real-time listener
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const updatedMessages: AnonymousMessage[] = [];
@@ -284,16 +434,16 @@ export default function VibraApp() {
             timestamp: data.timestamp?.toDate?.() || new Date(data.timestamp),
             likes: data.likes || 0,
             songId: data.songId,
-            likedBy: data.likedBy || []
+            likedBy: data.likedBy || [],
           });
         });
 
         // Update both messages and songs
         setAllMessages(updatedMessages);
-        setSongs(prevSongs => 
-          prevSongs.map(song => ({
+        setSongs((prevSongs) =>
+          prevSongs.map((song) => ({
             ...song,
-            messages: updatedMessages.filter(msg => msg.songId === song.id),
+            messages: updatedMessages.filter((msg) => msg.songId === song.id),
           }))
         );
       });
@@ -312,9 +462,9 @@ export default function VibraApp() {
   // Load initial data on component mount
   useEffect(() => {
     const unsubscribePromise = loadInitialData();
-    
+
     return () => {
-      unsubscribePromise.then(unsubscribe => {
+      unsubscribePromise.then((unsubscribe) => {
         if (unsubscribe) unsubscribe();
       });
     };
@@ -322,14 +472,19 @@ export default function VibraApp() {
 
   // Function to assign mood based on song title and artist
   const assignMoodToSong = (title: string, artist: string): string[] => {
-    const lowerTitle = title.toLowerCase()
-    const lowerArtist = artist.toLowerCase()
-    const text = `${lowerTitle} ${lowerArtist}`
+    const lowerTitle = title.toLowerCase();
+    const lowerArtist = artist.toLowerCase();
+    const text = `${lowerTitle} ${lowerArtist}`;
 
-    const moods: string[] = []
+    const moods: string[] = [];
 
-    if (text.includes("love") || text.includes("heart") || text.includes("romantic") || text.includes("kiss")) {
-      moods.push("love", "romantic")
+    if (
+      text.includes("love") ||
+      text.includes("heart") ||
+      text.includes("romantic") ||
+      text.includes("kiss")
+    ) {
+      moods.push("love", "romantic");
     }
     if (
       text.includes("sad") ||
@@ -339,7 +494,7 @@ export default function VibraApp() {
       text.includes("hurt") ||
       text.includes("pain")
     ) {
-      moods.push("melancholy")
+      moods.push("melancholy");
     }
     if (
       text.includes("happy") ||
@@ -348,7 +503,7 @@ export default function VibraApp() {
       text.includes("party") ||
       text.includes("smile")
     ) {
-      moods.push("joy", "upbeat", "celebration")
+      moods.push("joy", "upbeat", "celebration");
     }
     if (
       text.includes("dance") ||
@@ -357,7 +512,7 @@ export default function VibraApp() {
       text.includes("pump") ||
       text.includes("rock")
     ) {
-      moods.push("energetic", "upbeat")
+      moods.push("energetic", "upbeat");
     }
     if (
       text.includes("calm") ||
@@ -366,7 +521,7 @@ export default function VibraApp() {
       text.includes("quiet") ||
       text.includes("soft")
     ) {
-      moods.push("peaceful", "contemplative")
+      moods.push("peaceful", "contemplative");
     }
     if (
       text.includes("motivat") ||
@@ -375,7 +530,7 @@ export default function VibraApp() {
       text.includes("fight") ||
       text.includes("win")
     ) {
-      moods.push("motivational", "empowerment")
+      moods.push("motivational", "empowerment");
     }
     if (
       text.includes("memory") ||
@@ -384,34 +539,41 @@ export default function VibraApp() {
       text.includes("yesterday") ||
       text.includes("old")
     ) {
-      moods.push("nostalgia", "contemplative")
+      moods.push("nostalgia", "contemplative");
     }
-    if (text.includes("alone") || text.includes("lonely") || text.includes("empty") || text.includes("miss")) {
-      moods.push("lonely", "melancholy")
+    if (
+      text.includes("alone") ||
+      text.includes("lonely") ||
+      text.includes("empty") ||
+      text.includes("miss")
+    ) {
+      moods.push("lonely", "melancholy");
     }
 
     // Genre-based mood assignment
-    if (text.includes("blues")) moods.push("melancholy", "contemplative")
-    if (text.includes("jazz")) moods.push("contemplative", "peaceful")
-    if (text.includes("classical")) moods.push("peaceful", "epic")
-    if (text.includes("metal") || text.includes("punk")) moods.push("energetic", "dramatic")
-    if (text.includes("folk")) moods.push("contemplative", "nostalgia")
-    if (text.includes("pop")) moods.push("upbeat", "joy")
-    if (text.includes("rap") || text.includes("hip hop")) moods.push("energetic", "empowerment")
+    if (text.includes("blues")) moods.push("melancholy", "contemplative");
+    if (text.includes("jazz")) moods.push("contemplative", "peaceful");
+    if (text.includes("classical")) moods.push("peaceful", "epic");
+    if (text.includes("metal") || text.includes("punk"))
+      moods.push("energetic", "dramatic");
+    if (text.includes("folk")) moods.push("contemplative", "nostalgia");
+    if (text.includes("pop")) moods.push("upbeat", "joy");
+    if (text.includes("rap") || text.includes("hip hop"))
+      moods.push("energetic", "empowerment");
 
     // Default moods if none detected
     if (moods.length === 0) {
       if (text.includes("slow") || text.includes("ballad")) {
-        moods.push("tender", "contemplative")
+        moods.push("tender", "contemplative");
       } else if (text.includes("fast") || text.includes("up")) {
-        moods.push("energetic", "upbeat")
+        moods.push("energetic", "upbeat");
       } else {
-        moods.push("contemplative", "peaceful")
+        moods.push("contemplative", "peaceful");
       }
     }
 
-    return [...new Set(moods)] // Remove duplicates
-  }
+    return [...new Set(moods)]; // Remove duplicates
+  };
 
   // Function to get primary emotion from moods
   const getPrimaryEmotion = (moods: string[]): string => {
@@ -424,26 +586,30 @@ export default function VibraApp() {
       "nostalgia",
       "contemplative",
       "melancholy",
-    ]
+    ];
 
     for (const emotion of emotionPriority) {
-      if (moods.includes(emotion)) return emotion
+      if (moods.includes(emotion)) return emotion;
     }
 
-    return moods[0] || "contemplative"
-  }
+    return moods[0] || "contemplative";
+  };
 
   // Function to fetch songs from Saavn API
   const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
     try {
-      const res = await fetch(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`)
-      const data = await res.json()
+      const res = await fetch(
+        `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`
+      );
+      const data = await res.json();
 
       if (data.success && data.data && data.data.results) {
         return data.data.results.slice(0, 30).map((saavnSong: any) => {
-          const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
-          const moods = assignMoodToSong(saavnSong.name, artist)
-          const emotion = getPrimaryEmotion(moods)
+          const artist =
+            saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") ||
+            "Unknown Artist";
+          const moods = assignMoodToSong(saavnSong.name, artist);
+          const emotion = getPrimaryEmotion(moods);
 
           return {
             id: `saavn_${saavnSong.id}`,
@@ -453,41 +619,47 @@ export default function VibraApp() {
             mood: moods,
             emotion: emotion,
             coverUrl:
-              saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+              saavnSong.image?.find((img: any) => img.quality === "500x500")
+                ?.url ||
               saavnSong.image?.[saavnSong.image.length - 1]?.url ||
               "/placeholder.svg?height=300&width=300",
             audioUrl:
-              saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+              saavnSong.downloadUrl?.find(
+                (url: any) => url.quality === "320kbps"
+              )?.url ||
               saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
               "",
             previewUrl: "",
             externalUrl: saavnSong.url || "",
             messages: [], // Will be populated later
-            plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+            plays:
+              saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
             duration: saavnSong.duration || 180,
             source: "saavn",
-          }
-        })
+          };
+        });
       }
-      return []
+      return [];
     } catch (error) {
-      console.error("Error fetching Saavn songs:", error)
-      return []
+      console.error("Error fetching Saavn songs:", error);
+      return [];
     }
-  }
+  };
 
   // Function to fetch a song by ID
   const fetchSongById = async (id: string): Promise<Song | null> => {
     try {
-      const saavnId = id.replace("saavn_", "")
-      const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`)
-      const data = await res.json()
+      const saavnId = id.replace("saavn_", "");
+      const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`);
+      const data = await res.json();
 
       if (data.success && data.data && data.data.length > 0) {
-        const saavnSong = data.data[0]
-        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
-        const moods = assignMoodToSong(saavnSong.name, artist)
-        const emotion = getPrimaryEmotion(moods)
+        const saavnSong = data.data[0];
+        const artist =
+          saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") ||
+          "Unknown Artist";
+        const moods = assignMoodToSong(saavnSong.name, artist);
+        const emotion = getPrimaryEmotion(moods);
 
         return {
           id: `saavn_${saavnSong.id}`,
@@ -497,27 +669,32 @@ export default function VibraApp() {
           mood: moods,
           emotion: emotion,
           coverUrl:
-            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+            saavnSong.image?.find((img: any) => img.quality === "500x500")
+              ?.url ||
             saavnSong.image?.[saavnSong.image.length - 1]?.url ||
             "/placeholder.svg?height=300&width=300",
           audioUrl:
-            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")
+              ?.url ||
             saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
             "",
           previewUrl: "",
           externalUrl: saavnSong.url || "",
-          messages: allMessages.filter(msg => msg.songId === `saavn_${saavnSong.id}`),
-          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+          messages: allMessages.filter(
+            (msg) => msg.songId === `saavn_${saavnSong.id}`
+          ),
+          plays:
+            saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
           duration: saavnSong.duration || 180,
           source: "saavn",
-        }
+        };
       }
-      return null
+      return null;
     } catch (error) {
-      console.error("Error fetching song by ID:", error)
-      return null
+      console.error("Error fetching song by ID:", error);
+      return null;
     }
-  }
+  };
 
   // Fallback songs when APIs fail
   const getFallbackSongs = (query: string): Song[] => {
@@ -570,21 +747,21 @@ export default function VibraApp() {
         duration: 258,
         source: "saavn" as const,
       },
-    ]
+    ];
 
     // Filter fallback songs based on query if provided
     if (query && query.trim()) {
-      const lowerQuery = query.toLowerCase()
+      const lowerQuery = query.toLowerCase();
       return fallbackTracks.filter(
         (track) =>
           track.title.toLowerCase().includes(lowerQuery) ||
           track.artist.toLowerCase().includes(lowerQuery) ||
-          track.mood.some((mood) => mood.toLowerCase().includes(lowerQuery)),
-      )
+          track.mood.some((mood) => mood.toLowerCase().includes(lowerQuery))
+      );
     }
 
-    return fallbackTracks
-  }
+    return fallbackTracks;
+  };
 
   // Load initial songs from Saavn API
   const loadInitialSongs = async (): Promise<Song[]> => {
@@ -600,207 +777,234 @@ export default function VibraApp() {
         "telugu songs",
         "trending songs",
         "popular music",
-      ]
+      ];
 
-      const allSongs: Song[] = []
+      const allSongs: Song[] = [];
 
       // Fetch from Saavn API
       const fetchPromises = queries.map(async (query) => {
         try {
-          const songs = await fetchSaavnSongs(query)
-          return songs
+          const songs = await fetchSaavnSongs(query);
+          return songs;
         } catch (error) {
-          console.error(`Failed to fetch songs for query "${query}":`, error)
-          return []
+          console.error(`Failed to fetch songs for query "${query}":`, error);
+          return [];
         }
-      })
+      });
 
-      const results = await Promise.all(fetchPromises)
-      results.forEach((songs) => allSongs.push(...songs))
+      const results = await Promise.all(fetchPromises);
+      results.forEach((songs) => allSongs.push(...songs));
 
       // If no songs were fetched, use fallback
       if (allSongs.length === 0) {
-        allSongs.push(...getFallbackSongs(""))
+        allSongs.push(...getFallbackSongs(""));
       }
 
       // Remove duplicates and shuffle
       const uniqueSongs = allSongs
         .filter(
-          (song, index, self) => index === self.findIndex((s) => s.title === song.title && s.artist === song.artist),
+          (song, index, self) =>
+            index ===
+            self.findIndex(
+              (s) => s.title === song.title && s.artist === song.artist
+            )
         )
         .sort(() => Math.random() - 0.5)
-        .slice(0, 100)
+        .slice(0, 100);
 
       return uniqueSongs;
     } catch (error) {
-      console.error("Error loading initial songs:", error)
-      return getFallbackSongs("")
+      console.error("Error loading initial songs:", error);
+      return getFallbackSongs("");
     }
-  }
+  };
 
   // Search songs from Saavn API
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      loadInitialData()
-      return
+      loadInitialData();
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const results = await fetchSaavnSongs(searchQuery)
-      
+      const results = await fetchSaavnSongs(searchQuery);
+
       // Also search messages
       const messagesSnapshot = await getDocs(
         query(
-          collection(db, "messages"), 
+          collection(db, "messages"),
           where("content", ">=", searchQuery),
           where("content", "<=", searchQuery + "\uf8ff")
         )
-      )
-      
-      const songIds = [...new Set(messagesSnapshot.docs.map(d => d.data().songId))]
-      const songPromises = songIds.map(id => fetchSongById(id))
-      const newSongs = (await Promise.all(songPromises)).filter(Boolean)
-      
+      );
+
+      const songIds = [
+        ...new Set(messagesSnapshot.docs.map((d) => d.data().songId)),
+      ];
+      const songPromises = songIds.map((id) => fetchSongById(id));
+      const newSongs = (await Promise.all(songPromises)).filter(Boolean);
+
       // Combine results
       const combinedSongs = [...results, ...newSongs].filter(
-        (song, index, self) => song && index === self.findIndex(s => s && s.id === song.id)
-      )
+        (song, index, self) =>
+          song && index === self.findIndex((s) => s && s.id === song.id)
+      );
 
-      setSongs(combinedSongs.length > 0 ? combinedSongs.filter((s): s is Song => s !== null) : getFallbackSongs(searchQuery))
+      setSongs(
+        combinedSongs.length > 0
+          ? combinedSongs.filter((s): s is Song => s !== null)
+          : getFallbackSongs(searchQuery)
+      );
     } catch (error) {
-      console.error("Error searching songs:", error)
-      setSongs(getFallbackSongs(searchQuery))
+      console.error("Error searching songs:", error);
+      setSongs(getFallbackSongs(searchQuery));
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Filter by mood
   const handleMoodFilter = async (mood: string) => {
-    setSelectedMood(mood)
+    setSelectedMood(mood);
 
     if (!mood) {
-      loadInitialData()
-      return
+      loadInitialData();
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const queries = moodQueries[mood as keyof typeof moodQueries] || [mood]
-      const allSongs: Song[] = []
+      const queries = moodQueries[mood as keyof typeof moodQueries] || [mood];
+      const allSongs: Song[] = [];
 
       for (const query of queries.slice(0, 3)) {
-        const songs = await fetchSaavnSongs(query)
-        allSongs.push(...songs)
+        const songs = await fetchSaavnSongs(query);
+        allSongs.push(...songs);
       }
 
       if (allSongs.length === 0) {
-        const fallbackSongs = getFallbackSongs("").filter((song) => song.mood.includes(mood))
-        allSongs.push(...fallbackSongs)
+        const fallbackSongs = getFallbackSongs("").filter((song) =>
+          song.mood.includes(mood)
+        );
+        allSongs.push(...fallbackSongs);
       }
 
       const uniqueSongs = allSongs.filter(
-        (song, index, self) => index === self.findIndex((s) => s.title === song.title && s.artist === song.artist),
-      )
+        (song, index, self) =>
+          index ===
+          self.findIndex(
+            (s) => s.title === song.title && s.artist === song.artist
+          )
+      );
 
-      setSongs(uniqueSongs)
+      setSongs(uniqueSongs);
     } catch (error) {
-      console.error("Error filtering by mood:", error)
-      const fallbackSongs = getFallbackSongs("").filter((song) => song.mood.includes(mood))
-      setSongs(fallbackSongs)
+      console.error("Error filtering by mood:", error);
+      const fallbackSongs = getFallbackSongs("").filter((song) =>
+        song.mood.includes(mood)
+      );
+      setSongs(fallbackSongs);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Firebase Authentication functions
   const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (
       !signUpData.name ||
       !signUpData.email ||
       !signUpData.password ||
       signUpData.password !== signUpData.confirmPassword
     ) {
-      alert("Please fill all fields correctly")
-      return
+      alert("Please fill all fields correctly");
+      return;
     }
 
-    setAuthLoading(true)
+    setAuthLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, signUpData.email, signUpData.password)
-      console.log("User created:", userCredential.user)
-      setShowSignUp(false)
-      setSignUpData({ name: "", email: "", password: "", confirmPassword: "" })
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        signUpData.email,
+        signUpData.password
+      );
+      console.log("User created:", userCredential.user);
+      setShowSignUp(false);
+      setSignUpData({ name: "", email: "", password: "", confirmPassword: "" });
     } catch (error: any) {
-      console.error("Error signing up:", error)
-      alert(error.message)
+      console.error("Error signing up:", error);
+      alert(error.message);
     } finally {
-      setAuthLoading(false)
+      setAuthLoading(false);
     }
-  }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!signInData.email || !signInData.password) {
-      alert("Please fill all fields")
-      return
+      alert("Please fill all fields");
+      return;
     }
 
-    setAuthLoading(true)
+    setAuthLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, signInData.email, signInData.password)
-      console.log("User signed in:", userCredential.user)
-      setShowSignIn(false)
-      setSignInData({ email: "", password: "" })
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        signInData.email,
+        signInData.password
+      );
+      console.log("User signed in:", userCredential.user);
+      setShowSignIn(false);
+      setSignInData({ email: "", password: "" });
     } catch (error: any) {
-      console.error("Error signing in:", error)
-      alert(error.message)
+      console.error("Error signing in:", error);
+      alert(error.message);
     } finally {
-      setAuthLoading(false)
+      setAuthLoading(false);
     }
-  }
+  };
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth)
+      await signOut(auth);
       if (currentAudio) {
-        currentAudio.pause()
-        setCurrentAudio(null)
+        currentAudio.pause();
+        setCurrentAudio(null);
       }
-      setCurrentlyPlaying(null)
-      setPlaylists([])
-      setCurrentPlaylist(null)
+      setCurrentlyPlaying(null);
+      setPlaylists([]);
+      setCurrentPlaylist(null);
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("Error signing out:", error);
     }
-  }
+  };
 
   // Firebase Firestore functions
   const loadUserPlaylists = async (userId: string) => {
     try {
-      const playlistsRef = collection(db, "playlists")
-      const q = query(playlistsRef, where("userId", "==", userId))
-      const querySnapshot = await getDocs(q)
+      const playlistsRef = collection(db, "playlists");
+      const q = query(playlistsRef, where("userId", "==", userId));
+      const querySnapshot = await getDocs(q);
 
-      const userPlaylists: Playlist[] = []
+      const userPlaylists: Playlist[] = [];
       querySnapshot.forEach((doc) => {
         userPlaylists.push({
           id: doc.id,
           firebaseId: doc.id,
           ...doc.data(),
-        } as Playlist)
-      })
+        } as Playlist);
+      });
 
-      setPlaylists(userPlaylists)
+      setPlaylists(userPlaylists);
     } catch (error) {
-      console.error("Error loading playlists:", error)
+      console.error("Error loading playlists:", error);
     }
-  }
+  };
 
   const createPlaylist = async () => {
-    if (!newPlaylistName.trim() || !user) return
+    if (!newPlaylistName.trim() || !user) return;
 
     try {
       const playlistData = {
@@ -810,89 +1014,97 @@ export default function VibraApp() {
         createdAt: new Date().toISOString(),
         isPublic: false,
         userId: user.id,
-      }
+      };
 
-      const docRef = await addDoc(collection(db, "playlists"), playlistData)
+      const docRef = await addDoc(collection(db, "playlists"), playlistData);
 
       const newPlaylist: Playlist = {
         id: docRef.id,
         firebaseId: docRef.id,
         ...playlistData,
-      }
+      };
 
-      setPlaylists((prev) => [...prev, newPlaylist])
-      setNewPlaylistName("")
-      setNewPlaylistDescription("")
-      setShowCreatePlaylist(false)
-      toast.success(`Playlist "${newPlaylist.name}" created successfully`)
+      setPlaylists((prev) => [...prev, newPlaylist]);
+      setNewPlaylistName("");
+      setNewPlaylistDescription("");
+      setShowCreatePlaylist(false);
+      toast.success(`Playlist "${newPlaylist.name}" created successfully`);
     } catch (error) {
-      console.error("Error creating playlist:", error)
-      toast.error("Failed to create playlist")
+      console.error("Error creating playlist:", error);
+      toast.error("Failed to create playlist");
     }
-  }
+  };
 
   const addToPlaylist = async (song: Song, playlistId: string) => {
     try {
-      const playlist = playlists.find((p) => p.id === playlistId)
-      if (!playlist) return
+      const playlist = playlists.find((p) => p.id === playlistId);
+      if (!playlist) return;
 
       // Check if song already exists in playlist
-      if (playlist.songs.some(s => s.id === song.id)) {
-        toast.info(`"${song.title}" is already in "${playlist.name}"`)
-        return
+      if (playlist.songs.some((s) => s.id === song.id)) {
+        toast.info(`"${song.title}" is already in "${playlist.name}"`);
+        return;
       }
 
-      const updatedSongs = [...playlist.songs, song]
+      const updatedSongs = [...playlist.songs, song];
 
       if (playlist.firebaseId) {
         await updateDoc(doc(db, "playlists", playlist.firebaseId), {
           songs: updatedSongs,
-        })
+        });
       }
 
-      setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, songs: updatedSongs } : p)))
-      
-      toast.success(`"${song.title}" added to "${playlist.name}"`)
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlistId ? { ...p, songs: updatedSongs } : p
+        )
+      );
+
+      toast.success(`"${song.title}" added to "${playlist.name}"`);
     } catch (error) {
-      console.error("Error adding to playlist:", error)
-      toast.error('Failed to add song to playlist')
+      console.error("Error adding to playlist:", error);
+      toast.error("Failed to add song to playlist");
     }
-  }
+  };
 
   const removeFromPlaylist = async (songId: string, playlistId: string) => {
     try {
-      const playlist = playlists.find((p) => p.id === playlistId)
-      if (!playlist) return
+      const playlist = playlists.find((p) => p.id === playlistId);
+      if (!playlist) return;
 
-      const updatedSongs = playlist.songs.filter((s) => s.id !== songId)
+      const updatedSongs = playlist.songs.filter((s) => s.id !== songId);
 
       if (playlist.firebaseId) {
         await updateDoc(doc(db, "playlists", playlist.firebaseId), {
           songs: updatedSongs,
-        })
+        });
       }
 
-      setPlaylists((prev) => prev.map((p) => (p.id === playlistId ? { ...p, songs: updatedSongs } : p)))
-      toast.success("Song removed from playlist")
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlistId ? { ...p, songs: updatedSongs } : p
+        )
+      );
+      toast.success("Song removed from playlist");
     } catch (error) {
-      console.error("Error removing from playlist:", error)
-      toast.error("Failed to remove song from playlist")
+      console.error("Error removing from playlist:", error);
+      toast.error("Failed to remove song from playlist");
     }
-  }
+  };
 
   const deletePlaylist = async (playlistId: string) => {
     try {
-      const playlist = playlists.find((p) => p.id === playlistId)
-      if (!playlist || !playlist.firebaseId) return
+      const playlist = playlists.find((p) => p.id === playlistId);
+      if (!playlist || !playlist.firebaseId) return;
 
-      await deleteDoc(doc(db, "playlists", playlist.firebaseId))
-      setPlaylists((prev) => prev.filter((p) => p.id !== playlistId))
-      toast.success(`Playlist "${playlist.name}" deleted`)
+      await deleteDoc(doc(db, "playlists", playlist.firebaseId));
+      setPlaylists((prev) => prev.filter((p) => p.id !== playlistId));
+      toast.success(`Playlist "${playlist.name}" deleted`);
     } catch (error) {
-      console.error("Error deleting playlist:", error)
-      toast.error('Failed to delete playlist')
+      console.error("Error deleting playlist:", error);
+      toast.error("Failed to delete playlist");
     }
-  }
+  };
 
   const addAnonymousMessage = async (songId: string) => {
     // Check if user is logged in
@@ -903,43 +1115,43 @@ export default function VibraApp() {
       return;
     }
 
-    if (!newMessage.trim()) return
+    if (!newMessage.trim()) return;
 
     try {
-      const emotion = analyzeSentiment(newMessage)
+      const emotion = analyzeSentiment(newMessage);
       const messageData = {
         content: newMessage,
         emotion,
         timestamp: serverTimestamp(),
         likes: 0,
         songId: songId,
-        likedBy: []
-      }
+        likedBy: [],
+      };
 
-      await addDoc(collection(db, "messages"), messageData)
-      
+      await addDoc(collection(db, "messages"), messageData);
+
       // Check if song exists in current state
-      const songExists = songs.some(s => s.id === songId)
+      const songExists = songs.some((s) => s.id === songId);
       if (!songExists) {
-        const newSong = await fetchSongById(songId)
+        const newSong = await fetchSongById(songId);
         if (newSong) {
-          setSongs(prev => [...prev, newSong])
+          setSongs((prev) => [...prev, newSong]);
         }
       }
 
-      setMessageSuccess(true)
-      setNewMessage("")
-      toast.success("Your anonymous message has been shared")
+      setMessageSuccess(true);
+      setNewMessage("");
+      toast.success("Your anonymous message has been shared");
 
       setTimeout(() => {
-        setSelectedSongForMessage(null)
-        setMessageSuccess(false)
-      }, 2000)
+        setSelectedSongForMessage(null);
+        setMessageSuccess(false);
+      }, 2000);
     } catch (error) {
-      console.error("Error adding message:", error)
-      toast.error("Failed to send message. Please try again.")
+      console.error("Error adding message:", error);
+      toast.error("Failed to send message. Please try again.");
     }
-  }
+  };
 
   const likeMessage = async (messageId: string) => {
     if (!firebaseUser) {
@@ -949,113 +1161,139 @@ export default function VibraApp() {
     }
 
     try {
-      const messageRef = doc(db, "messages", messageId)
-      const message = allMessages.find(m => m.id === messageId)
-      
-      if (!message) return
+      const messageRef = doc(db, "messages", messageId);
+      const message = allMessages.find((m) => m.id === messageId);
+
+      if (!message) return;
 
       // Check if user already liked this message
       if (message.likedBy.includes(firebaseUser.uid)) {
-        toast.info("You've already liked this message")
-        return
+        toast.info("You've already liked this message");
+        return;
       }
 
       await updateDoc(messageRef, {
         likes: increment(1),
-        likedBy: arrayUnion(firebaseUser.uid)
-      })
+        likedBy: arrayUnion(firebaseUser.uid),
+      });
 
-      toast.success("Message liked")
+      toast.success("Message liked");
     } catch (error) {
-      console.error("Error liking message:", error)
-      toast.error("Failed to like message")
+      console.error("Error liking message:", error);
+      toast.error("Failed to like message");
     }
-  }
+  };
 
   // Playlist playback functions
   const playPlaylist = (playlist: Playlist) => {
-    if (playlist.songs.length === 0) return
+    if (playlist.songs.length === 0) return;
 
-    setCurrentPlaylist(playlist)
-    setCurrentSongIndex(0)
-    const firstSong = playlist.songs[0]
-    playSpecificSong(firstSong)
-  }
+    setCurrentPlaylist(playlist);
+    setCurrentSongIndex(0);
+    const firstSong = playlist.songs[0];
+    playSpecificSong(firstSong);
+  };
 
-const playSpecificSong = (song: Song) => {
-  if (currentAudio) {
-    currentAudio.pause();
-    setCurrentAudio(null);
-  }
+  const playSpecificSong = (song: Song) => {
+    if (currentAudio) {
+      currentAudio.pause();
+      setCurrentAudio(null);
+    }
 
-  if (progressInterval.current) {
-    clearInterval(progressInterval.current);
-    progressInterval.current = null;
-  }
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
 
-  if (song.audioUrl) {
-    const audio = new Audio(song.audioUrl);
-    audio.crossOrigin = "anonymous";
-    
-    // Set initial progress
-    setCurrentTime(0);
-    setPlaybackProgress(0);
+    if (song.audioUrl) {
+      const audio = new Audio(song.audioUrl);
+      audio.crossOrigin = "anonymous";
 
-    // Update progress while playing
-    const updateProgress = () => {
-      if (audio.duration) {
-        const progress = (audio.currentTime / audio.duration) * 100;
-        setPlaybackProgress(progress);
-        setCurrentTime(audio.currentTime);
-      }
-    };
+      // Set initial progress
+      setCurrentTime(0);
+      setPlaybackProgress(0);
 
-    progressInterval.current = setInterval(updateProgress, 1000);
-
-    audio.addEventListener('timeupdate', updateProgress);
-
-    audio
-      .play()
-      .then(() => {
-        setCurrentAudio(audio);
-        setCurrentlyPlaying(song.id);
-        
-        // If playing from playlist, find the current index
-        if (currentPlaylist) {
-          const index = currentPlaylist.songs.findIndex(s => s.id === song.id);
-          if (index >= 0) {
-            setCurrentSongIndex(index);
-          }
+      // Update progress while playing
+      const updateProgress = () => {
+        if (audio.duration) {
+          const progress = (audio.currentTime / audio.duration) * 100;
+          setPlaybackProgress(progress);
+          setCurrentTime(audio.currentTime);
         }
-      })
-      .catch((error) => {
-        console.error("Error playing audio:", error);
-        toast.error("Failed to play audio");
-      });
+      };
 
-    audio.onended = () => {
-      if (progressInterval.current) {
-        clearInterval(progressInterval.current);
-        progressInterval.current = null;
+      progressInterval.current = setInterval(updateProgress, 1000);
+
+      audio.addEventListener("timeupdate", updateProgress);
+
+      audio
+        .play()
+        .then(() => {
+          setCurrentAudio(audio);
+          setCurrentlyPlaying(song.id);
+
+          // If playing from playlist, find the current index
+          if (currentPlaylist) {
+            const index = currentPlaylist.songs.findIndex(
+              (s) => s.id === song.id
+            );
+            if (index >= 0) {
+              setCurrentSongIndex(index);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Error playing audio:", error);
+          toast.error("Failed to play audio");
+        });
+
+      audio.onended = () => {
+        if (progressInterval.current) {
+          clearInterval(progressInterval.current);
+          progressInterval.current = null;
+        }
+        audio.removeEventListener("timeupdate", updateProgress);
+        handleSongEnd();
+      };
+    } else {
+      toast.error("No audio URL available for this song");
+    }
+  };
+  const handleSongEnd = () => {
+    if (repeatMode === "one" && currentlyPlaying) {
+      // Replay the same song
+      const song = currentPlaylist
+        ? currentPlaylist.songs[currentSongIndex]
+        : songs.find((s) => s.id === currentlyPlaying);
+      if (song) playSpecificSong(song);
+    } else if (currentPlaylist && currentPlaylist.songs.length > 0) {
+      // Playlist playback logic
+      let nextIndex = currentSongIndex + 1;
+
+      if (nextIndex >= currentPlaylist.songs.length) {
+        if (repeatMode === "all") {
+          nextIndex = 0;
+        } else {
+          setCurrentlyPlaying(null);
+          setCurrentAudio(null);
+          return;
+        }
       }
-      audio.removeEventListener('timeupdate', updateProgress);
-      handleSongEnd();
-    };
-  } else {
-    toast.error("No audio URL available for this song");
-  }
-};
- const handleSongEnd = () => {
-  if (repeatMode === "one" && currentlyPlaying) {
-    // Replay the same song
-    const song = currentPlaylist 
-      ? currentPlaylist.songs[currentSongIndex]
-      : songs.find(s => s.id === currentlyPlaying);
-    if (song) playSpecificSong(song);
-  } else if (currentPlaylist && currentPlaylist.songs.length > 0) {
+
+      setCurrentSongIndex(nextIndex);
+      const nextSong = currentPlaylist.songs[nextIndex];
+      playSpecificSong(nextSong);
+    } else {
+      // Single song playback ended
+      setCurrentlyPlaying(null);
+      setCurrentAudio(null);
+    }
+  };
+ const playNext = () => {
+  if (currentPlaylist && currentPlaylist.songs.length > 0) {
     // Playlist playback logic
     let nextIndex = currentSongIndex + 1;
-
+    
     if (nextIndex >= currentPlaylist.songs.length) {
       if (repeatMode === "all") {
         nextIndex = 0;
@@ -1065,143 +1303,199 @@ const playSpecificSong = (song: Song) => {
         return;
       }
     }
-
-    setCurrentSongIndex(nextIndex);
-    const nextSong = currentPlaylist.songs[nextIndex];
-    playSpecificSong(nextSong);
-  } else {
-    // Single song playback ended
-    setCurrentlyPlaying(null);
-    setCurrentAudio(null);
-  }
-};
-const playNext = () => {
-  if (currentPlaylist && currentPlaylist.songs.length > 0) {
-    let nextIndex = currentSongIndex + 1;
-    if (nextIndex >= currentPlaylist.songs.length) {
-      nextIndex = 0;
-    }
+    
     setCurrentSongIndex(nextIndex);
     const nextSong = currentPlaylist.songs[nextIndex];
     playSpecificSong(nextSong);
   } else if (currentlyPlaying) {
-    // For single song playback, just stop
-    setCurrentlyPlaying(null);
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
+    // Non-playlist playback logic - play next song in filtered songs
+    const currentIndex = filteredSongs.findIndex(s => s.id === currentlyPlaying);
+    if (currentIndex >= 0 && currentIndex < filteredSongs.length - 1) {
+      const nextSong = filteredSongs[currentIndex + 1];
+      playSpecificSong(nextSong);
+    } else if (repeatMode === "all") {
+      // If at end and repeat all is on, go to first song
+      const firstSong = filteredSongs[0];
+      if (firstSong) playSpecificSong(firstSong);
+    } else {
+      // End of queue
+      setCurrentlyPlaying(null);
+      if (currentAudio) {
+        currentAudio.pause();
+        setCurrentAudio(null);
+      }
     }
   }
 };
 
 const playPrevious = () => {
   if (currentPlaylist && currentPlaylist.songs.length > 0) {
+    // Playlist playback logic
     let prevIndex = currentSongIndex - 1;
+    
     if (prevIndex < 0) {
-      prevIndex = currentPlaylist.songs.length - 1;
+      if (repeatMode === "all") {
+        prevIndex = currentPlaylist.songs.length - 1;
+      } else {
+        // Restart current song if not at beginning
+        if (currentAudio && currentAudio.currentTime > 3) {
+          currentAudio.currentTime = 0;
+          return;
+        }
+        prevIndex = 0;
+      }
     }
+    
     setCurrentSongIndex(prevIndex);
     const prevSong = currentPlaylist.songs[prevIndex];
     playSpecificSong(prevSong);
   } else if (currentlyPlaying) {
-    // For single song playback, restart the song
-    const song = songs.find(s => s.id === currentlyPlaying);
-    if (song) {
-      if (currentAudio) {
-        currentAudio.currentTime = 0;
-        setCurrentTime(0);
-        setPlaybackProgress(0);
-        if (currentAudio.paused) {
-          currentAudio.play();
-        }
-      } else {
-        playSpecificSong(song);
-      }
+    // Non-playlist playback logic
+    const currentIndex = filteredSongs.findIndex(s => s.id === currentlyPlaying);
+    
+    // If song has been playing for more than 3 seconds, restart it
+    if (currentAudio && currentAudio.currentTime > 3) {
+      currentAudio.currentTime = 0;
+      return;
+    }
+    
+    // Otherwise go to previous song
+    if (currentIndex > 0) {
+      const prevSong = filteredSongs[currentIndex - 1];
+      playSpecificSong(prevSong);
+    } else if (repeatMode === "all") {
+      // If at beginning and repeat all is on, go to last song
+      const lastSong = filteredSongs[filteredSongs.length - 1];
+      if (lastSong) playSpecificSong(lastSong);
     }
   }
 };
 
   const toggleRepeat = () => {
-    const modes: ("none" | "one" | "all")[] = ["none", "one", "all"]
-    const currentIndex = modes.indexOf(repeatMode)
-    const nextIndex = (currentIndex + 1) % modes.length
-    setRepeatMode(modes[nextIndex])
-    toast.success(`Repeat mode: ${modes[nextIndex]}`)
-  }
+    const modes: ("none" | "one" | "all")[] = ["none", "one", "all"];
+    const currentIndex = modes.indexOf(repeatMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    setRepeatMode(modes[nextIndex]);
+    toast.success(`Repeat mode: ${modes[nextIndex]}`);
+  };
 
   // Play/Pause audio
   const togglePlayback = (song: Song) => {
-  if (currentlyPlaying === song.id) {
-    // Pause current song
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
+    if (currentlyPlaying === song.id) {
+      // Pause current song
+      if (currentAudio) {
+        currentAudio.pause();
+        setCurrentAudio(null);
+      }
+      setCurrentlyPlaying(null);
+      toast.info(`Paused: ${song.title}`);
+    } else {
+      // Play new song - clear playlist context if playing individual song
+      if (
+        !currentPlaylist ||
+        !currentPlaylist.songs.some((s) => s.id === song.id)
+      ) {
+        setCurrentPlaylist(null);
+      }
+      playSpecificSong(song);
     }
-    setCurrentlyPlaying(null);
-    toast.info(`Paused: ${song.title}`);
-  } else {
-    // Play new song - clear playlist context if playing individual song
-    if (!currentPlaylist || !currentPlaylist.songs.some(s => s.id === song.id)) {
-      setCurrentPlaylist(null);
-    }
-    playSpecificSong(song);
-  }
-};
+  };
 
   // Open external link
   const openExternalLink = (url: string) => {
     if (url) {
-      window.open(url, "_blank", "noopener,noreferrer")
+      window.open(url, "_blank", "noopener,noreferrer");
     } else {
-      toast.error("No external URL available for this song")
+      toast.error("No external URL available for this song");
     }
-  }
+  };
 
   // Sentiment analysis function
   const analyzeSentiment = (text: string): string => {
-    const sadWords = ["sad", "hurt", "pain", "miss", "lonely", "cry", "broken", "lost", "empty", "depressed"]
-    const happyWords = ["happy", "joy", "love", "excited", "amazing", "wonderful", "great", "awesome", "fantastic"]
-    const anxiousWords = ["worried", "stress", "scared", "nervous", "anxious", "fear", "panic", "overwhelmed"]
-    const angryWords = ["angry", "mad", "furious", "hate", "rage", "annoyed", "frustrated", "pissed"]
+    const sadWords = [
+      "sad",
+      "hurt",
+      "pain",
+      "miss",
+      "lonely",
+      "cry",
+      "broken",
+      "lost",
+      "empty",
+      "depressed",
+    ];
+    const happyWords = [
+      "happy",
+      "joy",
+      "love",
+      "excited",
+      "amazing",
+      "wonderful",
+      "great",
+      "awesome",
+      "fantastic",
+    ];
+    const anxiousWords = [
+      "worried",
+      "stress",
+      "scared",
+      "nervous",
+      "anxious",
+      "fear",
+      "panic",
+      "overwhelmed",
+    ];
+    const angryWords = [
+      "angry",
+      "mad",
+      "furious",
+      "hate",
+      "rage",
+      "annoyed",
+      "frustrated",
+      "pissed",
+    ];
 
-    const lowerText = text.toLowerCase()
+    const lowerText = text.toLowerCase();
 
-    if (sadWords.some((word) => lowerText.includes(word))) return "melancholy"
-    if (happyWords.some((word) => lowerText.includes(word))) return "joy"
-    if (anxiousWords.some((word) => lowerText.includes(word))) return "anxiety"
-    if (angryWords.some((word) => lowerText.includes(word))) return "empowerment"
+    if (sadWords.some((word) => lowerText.includes(word))) return "melancholy";
+    if (happyWords.some((word) => lowerText.includes(word))) return "joy";
+    if (anxiousWords.some((word) => lowerText.includes(word))) return "anxiety";
+    if (angryWords.some((word) => lowerText.includes(word)))
+      return "empowerment";
 
-    return "contemplative"
-  }
+    return "contemplative";
+  };
 
   // Filter songs based on search and mood
   const filteredSongs = songs.filter((song) => {
-    const lowerQuery = searchQuery.toLowerCase()
+    const lowerQuery = searchQuery.toLowerCase();
     const matchesSearch =
       song.title.toLowerCase().includes(lowerQuery) ||
       song.artist.toLowerCase().includes(lowerQuery) ||
-      song.messages.some(message => 
+      song.messages.some((message) =>
         message.content.toLowerCase().includes(lowerQuery)
-      )
-    const matchesMood = !selectedMood || song.mood.includes(selectedMood)
-    return matchesSearch && matchesMood
-  })
+      );
+    const matchesMood = !selectedMood || song.mood.includes(selectedMood);
+    return matchesSearch && matchesMood;
+  });
 
   // Format duration
   const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // Get mood filter buttons
-  const moodFilters = [
-    { key: "love", label: "Love & Romance", icon: "💕" },
-  
-  ]
+  const moodFilters = [{ key: "love", label: "Love & Romance", icon: "💕" }];
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? "dark bg-gray-900" : "bg-gray-50"}`}>
+    <div
+      className={`min-h-screen transition-colors duration-300 ${
+        isDarkMode ? "dark bg-gray-900" : "bg-gray-50"
+      }`}
+    >
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-gray-800/95 dark:border-gray-800">
         <div className="container mx-auto px-4 py-4">
@@ -1220,7 +1514,11 @@ const playPrevious = () => {
 
             {/* Mobile Menu Button */}
             <div className="flex items-center gap-2 sm:hidden">
-              <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </div>
@@ -1230,112 +1528,143 @@ const playPrevious = () => {
               {user ? (
                 <div className="flex items-center gap-2">
                   <Dialog open={showPlaylists} onOpenChange={setShowPlaylists}>
-  <DialogTrigger asChild>
-    <Button variant="ghost" size="sm">
-      <ListMusic className="h-4 w-4" />
-      <span className="ml-2 hidden md:inline">Playlists ({playlists.length})</span>
-    </Button>
-  </DialogTrigger>
-  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-    <DialogHeader>
-      <DialogTitle className="flex items-center justify-between">
-        <span>Your Playlists</span>
-        <Button onClick={() => setShowCreatePlaylist(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1" />
-          Create Playlist
-        </Button>
-      </DialogTitle>
-      <DialogDescription>Manage your custom playlists</DialogDescription>
-    </DialogHeader>
-    <div className="space-y-4 mt-4">
-      {playlists.length === 0 ? (
-        <div className="text-center py-8">
-          <ListMusic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-300">
-            No playlists yet. Create your first playlist!
-          </p>
-        </div>
-      ) : (
-        playlists.map((playlist) => (
-          <Card key={playlist.id} className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-lg truncate">{playlist.name}</h3>
-                <p className="text-gray-600 dark:text-gray-300 text-sm truncate">{playlist.description}</p>
-                <p className="text-gray-500 text-xs mt-1">
-                  {playlist.songs.length} songs • {formatDuration(
-                    playlist.songs.reduce((total, song) => total + song.duration, 0)
-                  )} • Created {new Date(playlist.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => {
-                    playPlaylist(playlist);
-                    setShowPlaylists(false);
-                  }}
-                  disabled={playlist.songs.length === 0}
-                  size="sm"
-                  className="bg-gradient-to-r from-purple-600 to-pink-600"
-                >
-                  <PlayCircle className="h-4 w-4 mr-1" />
-                  Play
-                </Button>
-                <Button
-                  onClick={() => deletePlaylist(playlist.id)}
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            {playlist.songs.length > 0 && (
-              <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
-                {playlist.songs.map((song, index) => (
-                  <div 
-                    key={song.id} 
-                    className={`flex items-center gap-2 text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${currentPlaylist?.id === playlist.id && currentSongIndex === index ? 'bg-purple-50 dark:bg-purple-900/30' : ''}`}
-                    onClick={() => {
-                      if (currentPlaylist?.id !== playlist.id) {
-                        setCurrentPlaylist(playlist);
-                      }
-                      setCurrentSongIndex(index);
-                      playSpecificSong(song);
-                    }}
-                  >
-                    <img
-                      src={song.coverUrl || "/placeholder.svg"}
-                      alt={song.title}
-                      className="w-8 h-8 rounded object-cover"
-                    />
-                    <span className="flex-1 truncate">
-                      {song.title} - {song.artist}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {formatDuration(song.duration)}
-                    </span>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFromPlaylist(song.id, playlist.id);
-                      }}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        ))
-      )}
-    </div>
-  </DialogContent>
-</Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <ListMusic className="h-4 w-4" />
+                        <span className="ml-2 hidden md:inline">
+                          Playlists ({playlists.length})
+                        </span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center justify-between">
+                          <span>Your Playlists</span>
+                          <Button
+                            onClick={() => setShowCreatePlaylist(true)}
+                            size="sm"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Create Playlist
+                          </Button>
+                        </DialogTitle>
+                        <DialogDescription>
+                          Manage your custom playlists
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        {playlists.length === 0 ? (
+                          <div className="text-center py-8">
+                            <ListMusic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-600 dark:text-gray-300">
+                              No playlists yet. Create your first playlist!
+                            </p>
+                          </div>
+                        ) : (
+                          playlists.map((playlist) => (
+                            <Card key={playlist.id} className="p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-lg truncate">
+                                    {playlist.name}
+                                  </h3>
+                                  <p className="text-gray-600 dark:text-gray-300 text-sm truncate">
+                                    {playlist.description}
+                                  </p>
+                                  <p className="text-gray-500 text-xs mt-1">
+                                    {playlist.songs.length} songs •{" "}
+                                    {formatDuration(
+                                      playlist.songs.reduce(
+                                        (total, song) => total + song.duration,
+                                        0
+                                      )
+                                    )}{" "}
+                                    • Created{" "}
+                                    {new Date(
+                                      playlist.createdAt
+                                    ).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    onClick={() => {
+                                      playPlaylist(playlist);
+                                      setShowPlaylists(false);
+                                    }}
+                                    disabled={playlist.songs.length === 0}
+                                    size="sm"
+                                    className="bg-gradient-to-r from-purple-600 to-pink-600"
+                                  >
+                                    <PlayCircle className="h-4 w-4 mr-1" />
+                                    Play
+                                  </Button>
+                                  <Button
+                                    onClick={() => deletePlaylist(playlist.id)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                              {playlist.songs.length > 0 && (
+                                <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
+                                  {playlist.songs.map((song, index) => (
+                                    <div
+                                      key={song.id}
+                                      className={`flex items-center gap-2 text-sm p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                        currentPlaylist?.id === playlist.id &&
+                                        currentSongIndex === index
+                                          ? "bg-purple-50 dark:bg-purple-900/30"
+                                          : ""
+                                      }`}
+                                      onClick={() => {
+                                        if (
+                                          currentPlaylist?.id !== playlist.id
+                                        ) {
+                                          setCurrentPlaylist(playlist);
+                                        }
+                                        setCurrentSongIndex(index);
+                                        playSpecificSong(song);
+                                      }}
+                                    >
+                                      <img
+                                        src={
+                                          song.coverUrl || "/placeholder.svg"
+                                        }
+                                        alt={song.title}
+                                        className="w-8 h-8 rounded object-cover"
+                                      />
+                                      <span className="flex-1 truncate">
+                                        {song.title} - {song.artist}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {formatDuration(song.duration)}
+                                      </span>
+                                      <Button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeFromPlaylist(
+                                            song.id,
+                                            playlist.id
+                                          );
+                                        }}
+                                        variant="ghost"
+                                        size="sm"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </Card>
+                          ))
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
                   <Dialog open={showProfile} onOpenChange={setShowProfile}>
                     <DialogTrigger asChild>
@@ -1347,7 +1676,9 @@ const playPrevious = () => {
                     <DialogContent className="max-w-2xl">
                       <DialogHeader>
                         <DialogTitle>Your Profile</DialogTitle>
-                        <DialogDescription>Manage your account and preferences</DialogDescription>
+                        <DialogDescription>
+                          Manage your account and preferences
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-6 mt-4">
                         <div className="flex items-center gap-4">
@@ -1355,21 +1686,35 @@ const playPrevious = () => {
                             {user.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <h3 className="text-xl font-semibold">{user.name}</h3>
-                            <p className="text-gray-600 dark:text-gray-300">{user.email}</p>
+                            <h3 className="text-xl font-semibold">
+                              {user.name}
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-300">
+                              {user.email}
+                            </p>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                           <Card className="p-4 text-center">
-                            <h4 className="text-2xl font-bold text-purple-600">{playlists.length}</h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">Playlists Created</p>
+                            <h4 className="text-2xl font-bold text-purple-600">
+                              {playlists.length}
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              Playlists Created
+                            </p>
                           </Card>
                           <Card className="p-4 text-center">
                             <h4 className="text-2xl font-bold text-pink-600">
-                              {playlists.reduce((total, playlist) => total + playlist.songs.length, 0)}
+                              {playlists.reduce(
+                                (total, playlist) =>
+                                  total + playlist.songs.length,
+                                0
+                              )}
                             </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">Songs Saved</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                              Songs Saved
+                            </p>
                           </Card>
                         </div>
 
@@ -1424,7 +1769,10 @@ const playPrevious = () => {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Sign In to Vibra</DialogTitle>
-                        <DialogDescription>Sign in to create playlists and save your favorite songs</DialogDescription>
+                        <DialogDescription>
+                          Sign in to create playlists and save your favorite
+                          songs
+                        </DialogDescription>
                       </DialogHeader>
                       <form onSubmit={handleSignIn} className="space-y-4">
                         <div>
@@ -1432,7 +1780,12 @@ const playPrevious = () => {
                             type="email"
                             placeholder="Email"
                             value={signInData.email}
-                            onChange={(e) => setSignInData({ ...signInData, email: e.target.value })}
+                            onChange={(e) =>
+                              setSignInData({
+                                ...signInData,
+                                email: e.target.value,
+                              })
+                            }
                             required
                           />
                         </div>
@@ -1441,12 +1794,21 @@ const playPrevious = () => {
                             type="password"
                             placeholder="Password"
                             value={signInData.password}
-                            onChange={(e) => setSignInData({ ...signInData, password: e.target.value })}
+                            onChange={(e) =>
+                              setSignInData({
+                                ...signInData,
+                                password: e.target.value,
+                              })
+                            }
                             required
                           />
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setShowSignIn(false)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowSignIn(false)}
+                          >
                             Cancel
                           </Button>
                           <Button
@@ -1454,7 +1816,11 @@ const playPrevious = () => {
                             className="bg-gradient-to-r from-purple-600 to-pink-600"
                             disabled={authLoading}
                           >
-                            {authLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign In"}
+                            {authLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Sign In"
+                            )}
                           </Button>
                         </div>
                       </form>
@@ -1463,7 +1829,10 @@ const playPrevious = () => {
 
                   <Dialog open={showSignUp} onOpenChange={setShowSignUp}>
                     <DialogTrigger asChild>
-                      <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600">
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-purple-600 to-pink-600"
+                      >
                         <UserPlus className="h-4 w-4" />
                         <span className="ml-2 hidden md:inline">Sign Up</span>
                       </Button>
@@ -1471,7 +1840,9 @@ const playPrevious = () => {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>Join Vibra</DialogTitle>
-                        <DialogDescription>Create an account to unlock playlist features</DialogDescription>
+                        <DialogDescription>
+                          Create an account to unlock playlist features
+                        </DialogDescription>
                       </DialogHeader>
                       <form onSubmit={handleSignUp} className="space-y-4">
                         <div>
@@ -1479,7 +1850,12 @@ const playPrevious = () => {
                             type="text"
                             placeholder="Full Name"
                             value={signUpData.name}
-                            onChange={(e) => setSignUpData({ ...signUpData, name: e.target.value })}
+                            onChange={(e) =>
+                              setSignUpData({
+                                ...signUpData,
+                                name: e.target.value,
+                              })
+                            }
                             required
                           />
                         </div>
@@ -1488,7 +1864,12 @@ const playPrevious = () => {
                             type="email"
                             placeholder="Email"
                             value={signUpData.email}
-                            onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                            onChange={(e) =>
+                              setSignUpData({
+                                ...signUpData,
+                                email: e.target.value,
+                              })
+                            }
                             required
                           />
                         </div>
@@ -1497,7 +1878,12 @@ const playPrevious = () => {
                             type="password"
                             placeholder="Password"
                             value={signUpData.password}
-                            onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                            onChange={(e) =>
+                              setSignUpData({
+                                ...signUpData,
+                                password: e.target.value,
+                              })
+                            }
                             required
                           />
                         </div>
@@ -1506,12 +1892,21 @@ const playPrevious = () => {
                             type="password"
                             placeholder="Confirm Password"
                             value={signUpData.confirmPassword}
-                            onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+                            onChange={(e) =>
+                              setSignUpData({
+                                ...signUpData,
+                                confirmPassword: e.target.value,
+                              })
+                            }
                             required
                           />
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setShowSignUp(false)}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowSignUp(false)}
+                          >
                             Cancel
                           </Button>
                           <Button
@@ -1519,7 +1914,11 @@ const playPrevious = () => {
                             className="bg-gradient-to-r from-purple-600 to-pink-600"
                             disabled={authLoading}
                           >
-                            {authLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign Up"}
+                            {authLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Sign Up"
+                            )}
                           </Button>
                         </div>
                       </form>
@@ -1531,15 +1930,33 @@ const playPrevious = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+                onClick={() =>
+                  setViewMode(viewMode === "grid" ? "list" : "grid")
+                }
                 className="hidden sm:flex"
               >
-                {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
-                <span className="ml-2 hidden md:inline">{viewMode === "grid" ? "List View" : "Grid View"}</span>
+                {viewMode === "grid" ? (
+                  <List className="h-4 w-4" />
+                ) : (
+                  <Grid3X3 className="h-4 w-4" />
+                )}
+                <span className="ml-2 hidden md:inline">
+                  {viewMode === "grid" ? "List View" : "Grid View"}
+                </span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setIsDarkMode(!isDarkMode)}>
-                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                <span className="ml-2 hidden md:inline">{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDarkMode(!isDarkMode)}
+              >
+                {isDarkMode ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+                <span className="ml-2 hidden md:inline">
+                  {isDarkMode ? "Light Mode" : "Dark Mode"}
+                </span>
               </Button>
             </div>
           </div>
@@ -1554,8 +1971,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setShowPlaylists(true)
-                    setMobileMenuOpen(false)
+                    setShowPlaylists(true);
+                    setMobileMenuOpen(false);
                   }}
                 >
                   <ListMusic className="h-4 w-4 mr-2" />
@@ -1565,8 +1982,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setShowProfile(true)
-                    setMobileMenuOpen(false)
+                    setShowProfile(true);
+                    setMobileMenuOpen(false);
                   }}
                 >
                   <User className="h-4 w-4 mr-2" />
@@ -1576,8 +1993,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setIsDarkMode(!isDarkMode)
-                    setMobileMenuOpen(false)
+                    setIsDarkMode(!isDarkMode);
+                    setMobileMenuOpen(false);
                   }}
                 >
                   {isDarkMode ? (
@@ -1591,8 +2008,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setViewMode(viewMode === "grid" ? "list" : "grid")
-                    setMobileMenuOpen(false)
+                    setViewMode(viewMode === "grid" ? "list" : "grid");
+                    setMobileMenuOpen(false);
                   }}
                 >
                   {viewMode === "grid" ? (
@@ -1606,8 +2023,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start text-red-600"
                   onClick={() => {
-                    handleSignOut()
-                    setMobileMenuOpen(false)
+                    handleSignOut();
+                    setMobileMenuOpen(false);
                   }}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
@@ -1620,8 +2037,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setShowSignIn(true)
-                    setMobileMenuOpen(false)
+                    setShowSignIn(true);
+                    setMobileMenuOpen(false);
                   }}
                 >
                   <LogIn className="h-4 w-4 mr-2" />
@@ -1630,8 +2047,8 @@ const playPrevious = () => {
                 <Button
                   className="w-full justify-start bg-gradient-to-r from-purple-600 to-pink-600"
                   onClick={() => {
-                    setShowSignUp(true)
-                    setMobileMenuOpen(false)
+                    setShowSignUp(true);
+                    setMobileMenuOpen(false);
                   }}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -1641,8 +2058,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setIsDarkMode(!isDarkMode)
-                    setMobileMenuOpen(false)
+                    setIsDarkMode(!isDarkMode);
+                    setMobileMenuOpen(false);
                   }}
                 >
                   {isDarkMode ? (
@@ -1656,8 +2073,8 @@ const playPrevious = () => {
                   variant="ghost"
                   className="w-full justify-start"
                   onClick={() => {
-                    setViewMode(viewMode === "grid" ? "list" : "grid")
-                    setMobileMenuOpen(false)
+                    setViewMode(viewMode === "grid" ? "list" : "grid");
+                    setMobileMenuOpen(false);
                   }}
                 >
                   {viewMode === "grid" ? (
@@ -1674,131 +2091,144 @@ const playPrevious = () => {
       </header>
 
       {/* Now Playing Bar */}
-{/* Now Playing Bar - Embedded Below Navbar */}
-{(currentlyPlaying || (currentPlaylist && currentPlaylist.songs.length > 0)) && (
-  <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
-    <div className="container mx-auto">
-      <div className="flex items-center justify-between gap-4">
-        {/* Song Info */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <img
-            src={
-              currentPlaylist 
-                ? currentPlaylist.songs[currentSongIndex]?.coverUrl 
-                : songs.find(s => s.id === currentlyPlaying)?.coverUrl || "/placeholder.svg"
-            }
-            alt="Now playing"
-            className="w-12 h-12 rounded object-cover"
-          />
-          <div className="min-w-0">
-            <h4 className="font-semibold text-sm truncate">
-              {currentPlaylist 
-                ? currentPlaylist.songs[currentSongIndex]?.title
-                : songs.find(s => s.id === currentlyPlaying)?.title}
-            </h4>
-            <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
-              {currentPlaylist 
-                ? currentPlaylist.songs[currentSongIndex]?.artist
-                : songs.find(s => s.id === currentlyPlaying)?.artist}
-            </p>
-          </div>
-        </div>
-
-        {/* Player Controls */}
-        <div className="flex-1 max-w-md">
-          <div className="flex items-center justify-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={playPrevious}
-              disabled={!currentPlaylist || currentPlaylist.songs.length <= 1}
-            >
-              <SkipBack className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => {
-                if (currentPlaylist) {
-                  togglePlayback(currentPlaylist.songs[currentSongIndex]);
-                } else {
-                  const song = songs.find(s => s.id === currentlyPlaying);
-                  if (song) togglePlayback(song);
-                }
-              }}
-            >
-              {currentlyPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={playNext}
-              disabled={!currentPlaylist || currentPlaylist.songs.length <= 1}
-            >
-              <SkipForward className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
-              {formatDuration(currentTime)}
-            </span>
-            <div className="flex-1 relative group">
-              <Progress 
-                value={playbackProgress} 
-                className="h-2 cursor-pointer"
-                onClick={(e) => {
-                  if (currentAudio) {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const percent = (e.clientX - rect.left) / rect.width;
-                    const newTime = percent * currentAudio.duration;
-                    currentAudio.currentTime = newTime;
-                    setCurrentTime(newTime);
-                    setPlaybackProgress(percent * 100);
+      {/* Now Playing Bar - Embedded Below Navbar */}
+      {(currentlyPlaying ||
+        (currentPlaylist && currentPlaylist.songs.length > 0)) && (
+        <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
+          <div className="container mx-auto">
+            <div className="flex items-center justify-between gap-4">
+              {/* Song Info */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <img
+                  src={
+                    currentPlaylist
+                      ? currentPlaylist.songs[currentSongIndex]?.coverUrl
+                      : songs.find((s) => s.id === currentlyPlaying)
+                          ?.coverUrl || "/placeholder.svg"
                   }
-                }}
-              />
-              <div 
-                className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
-                style={{ width: `${playbackProgress}%` }}
-              />
+                  alt="Now playing"
+                  className="w-12 h-12 rounded object-cover"
+                />
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-sm truncate">
+                    {currentPlaylist
+                      ? currentPlaylist.songs[currentSongIndex]?.title
+                      : songs.find((s) => s.id === currentlyPlaying)?.title}
+                  </h4>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
+                    {currentPlaylist
+                      ? currentPlaylist.songs[currentSongIndex]?.artist
+                      : songs.find((s) => s.id === currentlyPlaying)?.artist}
+                  </p>
+                </div>
+              </div>
+
+              {/* Player Controls */}
+              <div className="flex-1 max-w-md">
+                <div className="flex items-center justify-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={playPrevious}
+                    disabled={
+                      !currentPlaylist || currentPlaylist.songs.length <= 1
+                    }
+                  >
+                    <SkipBack className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (currentPlaylist) {
+                        togglePlayback(currentPlaylist.songs[currentSongIndex]);
+                      } else {
+                        const song = songs.find(
+                          (s) => s.id === currentlyPlaying
+                        );
+                        if (song) togglePlayback(song);
+                      }
+                    }}
+                  >
+                    {currentlyPlaying ? (
+                      <Pause className="h-4 w-4" />
+                    ) : (
+                      <Play className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={playNext}
+                    disabled={
+                      !currentPlaylist || currentPlaylist.songs.length <= 1
+                    }
+                  >
+                    <SkipForward className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
+                    {formatDuration(currentTime)}
+                  </span>
+                  <div className="flex-1 relative group">
+                    <Progress
+                      value={playbackProgress}
+                      className="h-2 cursor-pointer"
+                      onClick={(e) => {
+                        if (currentAudio) {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const percent = (e.clientX - rect.left) / rect.width;
+                          const newTime = percent * currentAudio.duration;
+                          currentAudio.currentTime = newTime;
+                          setCurrentTime(newTime);
+                          setPlaybackProgress(percent * 100);
+                        }
+                      }}
+                    />
+                    <div
+                      className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
+                      style={{ width: `${playbackProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
+                    {formatDuration(
+                      currentPlaylist
+                        ? currentPlaylist.songs[currentSongIndex]?.duration || 0
+                        : songs.find((s) => s.id === currentlyPlaying)
+                            ?.duration || 0
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Additional Controls */}
+              <div className="flex items-center gap-2 flex-1 justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleRepeat}
+                  className={repeatMode !== "none" ? "text-purple-600" : ""}
+                >
+                  <Repeat className="h-4 w-4" />
+                  {repeatMode === "one" && (
+                    <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                      1
+                    </span>
+                  )}
+                </Button>
+                {currentPlaylist && (
+                  <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
+                    {currentSongIndex + 1} / {currentPlaylist.songs.length}
+                  </span>
+                )}
+              </div>
             </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
-              {formatDuration(
-                currentPlaylist 
-                  ? currentPlaylist.songs[currentSongIndex]?.duration || 0
-                  : songs.find(s => s.id === currentlyPlaying)?.duration || 0
-              )}
-            </span>
           </div>
         </div>
-
-        {/* Additional Controls */}
-        <div className="flex items-center gap-2 flex-1 justify-end">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={toggleRepeat}
-            className={repeatMode !== "none" ? "text-purple-600" : ""}
-          >
-            <Repeat className="h-4 w-4" />
-            {repeatMode === "one" && (
-              <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                1
-              </span>
-            )}
-          </Button>
-          {currentPlaylist && (
-            <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
-              {currentSongIndex + 1} / {currentPlaylist.songs.length}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
 
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
@@ -1810,8 +2240,8 @@ const playPrevious = () => {
           </div>
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
             <span className="italic">
-              "Every song tells a story, every story finds its song - especially those love and romance melodies that
-              speak to the heart"
+              "Every song tells a story, every story finds its song - especially
+              those love and romance melodies that speak to the heart"
             </span>
             <Heart className="h-4 w-4 text-pink-500" />
           </div>
@@ -1835,7 +2265,11 @@ const playPrevious = () => {
               className="h-14 px-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
               disabled={isLoading}
             >
-              {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Search className="h-5 w-5" />
+              )}
             </Button>
           </div>
 
@@ -1845,7 +2279,11 @@ const playPrevious = () => {
               variant={selectedMood === "" ? "default" : "outline"}
               size="sm"
               onClick={() => handleMoodFilter("")}
-              className={selectedMood === "" ? "bg-gradient-to-r from-purple-600 to-pink-600" : ""}
+              className={
+                selectedMood === ""
+                  ? "bg-gradient-to-r from-purple-600 to-pink-600"
+                  : ""
+              }
             >
               <Filter className="h-4 w-4 mr-1" />
               All Moods
@@ -1873,8 +2311,12 @@ const playPrevious = () => {
         {isLoading && (
           <div className="text-center py-12">
             <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
-            <p className="text-gray-600 dark:text-gray-300">Finding tracks from Saavn</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Searching songs...
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              Finding tracks from Saavn
+            </p>
           </div>
         )}
 
@@ -1902,8 +2344,9 @@ const playPrevious = () => {
                           alt={`${song.title} cover`}
                           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/placeholder.svg?height=300&width=300"
+                            const target = e.target as HTMLImageElement;
+                            target.src =
+                              "/placeholder.svg?height=300&width=300";
                           }}
                         />
                         <div className="absolute top-2 right-2 flex gap-1">
@@ -1939,7 +2382,9 @@ const playPrevious = () => {
                           <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 group-hover:text-purple-600 transition-colors line-clamp-1">
                             {song.title}
                           </h3>
-                          <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
+                          <p className="text-gray-600 dark:text-gray-300 line-clamp-1">
+                            {song.artist}
+                          </p>
                         </div>
 
                         <div className="flex flex-wrap gap-1">
@@ -1947,7 +2392,10 @@ const playPrevious = () => {
                             <Badge
                               key={mood}
                               variant="secondary"
-                              className={`text-xs ${moodColors[mood as keyof typeof moodColors] || "bg-gray-100 text-gray-800"}`}
+                              className={`text-xs ${
+                                moodColors[mood as keyof typeof moodColors] ||
+                                "bg-gray-100 text-gray-800"
+                              }`}
                             >
                               {mood}
                             </Badge>
@@ -1966,41 +2414,93 @@ const playPrevious = () => {
                         </div>
 
                         <div className="flex gap-2">
-                          {user && playlists.length > 0 && (
-                            <Dialog>
-                              <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="bg-transparent">
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Add
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Add to Playlist</DialogTitle>
-                                  <DialogDescription>Choose a playlist to add this song to</DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-2 mt-4">
-                                  {playlists.map((playlist) => (
-                                    <Button
-                                      key={playlist.id}
-                                      variant="outline"
-                                      onClick={() => addToPlaylist(song, playlist.id)}
-                                      className="w-full justify-start"
-                                    >
-                                      {playlist.name}
-                                    </Button>
-                                  ))}
-                                  {playlists.length === 0 && (
-                                    <p className="text-center text-gray-500">No playlists created yet.</p>
-                                  )}
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                          )}
+                         {/* Replace the existing "Add to Playlist" button with this dropdown menu */}
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+      <MoreHorizontal className="h-4 w-4" />
+    </Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent className="w-48">
+    <DropdownMenuItem 
+      onClick={() => togglePlayback(song)}
+      disabled={!song.audioUrl}
+    >
+      <Play className="h-4 w-4 mr-2" />
+      Play Now
+    </DropdownMenuItem>
+    <DropdownMenuItem 
+      onClick={() => {
+        // Implement play next functionality
+        toast.info("Added to queue (play next)");
+      }}
+    >
+      <SkipForward className="h-4 w-4 mr-2" />
+      Play Next
+    </DropdownMenuItem>
+    <DropdownMenuItem 
+      onClick={() => {
+        // Implement add to queue functionality
+        toast.info("Added to queue");
+      }}
+    >
+      <ListMusic className="h-4 w-4 mr-2" />
+      Add to Queue
+    </DropdownMenuItem>
+    {song.audioUrl && (
+      <DropdownMenuItem 
+        onClick={() => {
+          // Implement download functionality
+          const link = document.createElement('a');
+          link.href = song.audioUrl;
+          link.download = `${song.title} - ${song.artist}.mp3`;
+          link.click();
+          toast.success("Download started");
+        }}
+      >
+        <Download className="h-4 w-4 mr-2" />
+        Download
+      </DropdownMenuItem>
+    )}
+    {user && (
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <Plus className="h-4 w-4 mr-2" />
+          Add to Playlist
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          {playlists.length > 0 ? (
+            playlists.map((playlist) => (
+              <DropdownMenuItem 
+                key={playlist.id}
+                onClick={() => addToPlaylist(song, playlist.id)}
+              >
+                {playlist.name}
+              </DropdownMenuItem>
+            ))
+          ) : (
+            <DropdownMenuItem disabled>
+              No playlists
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setShowCreatePlaylist(true)}>
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Create New
+          </DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    )}
+  </DropdownMenuContent>
+</DropdownMenu>
 
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="bg-transparent">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="bg-transparent"
+                              >
                                 <MessageCircle className="h-4 w-4 mr-1" />
                                 Read ({song.messages.length})
                               </Button>
@@ -2011,34 +2511,52 @@ const playPrevious = () => {
                                   <Music className="h-5 w-5" />
                                   {song.title} - {song.artist}
                                 </DialogTitle>
-                                <DialogDescription>Anonymous messages from the community</DialogDescription>
+                                <DialogDescription>
+                                  Anonymous messages from the community
+                                </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 mt-4">
                                 {song.messages.length > 0 ? (
-                                  song.messages.map(message => (
-                                    <div key={message.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                      <p className="text-gray-900 dark:text-gray-100 mb-2">{message.content}</p>
+                                  song.messages.map((message) => (
+                                    <div
+                                      key={message.id}
+                                      className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                                    >
+                                      <p className="text-gray-900 dark:text-gray-100 mb-2">
+                                        {message.content}
+                                      </p>
                                       <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
                                         <div className="flex items-center gap-2">
                                           <Badge
                                             variant="secondary"
-                                            className={`text-xs ${moodColors[message.emotion as keyof typeof moodColors] || "bg-gray-100 text-gray-800"}`}
+                                            className={`text-xs ${
+                                              moodColors[
+                                                message.emotion as keyof typeof moodColors
+                                              ] || "bg-gray-100 text-gray-800"
+                                            }`}
                                           >
                                             {message.emotion}
                                           </Badge>
                                           <span>
                                             {message.timestamp instanceof Date
                                               ? message.timestamp.toLocaleDateString()
-                                              : new Date(message.timestamp).toLocaleDateString()}
+                                              : new Date(
+                                                  message.timestamp
+                                                ).toLocaleDateString()}
                                           </span>
                                         </div>
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          onClick={() => likeMessage(message.id)}
+                                          onClick={() =>
+                                            likeMessage(message.id)
+                                          }
                                           className={`flex items-center gap-1 ${
-                                            firebaseUser && message.likedBy.includes(firebaseUser.uid) 
-                                              ? "text-red-500" 
+                                            firebaseUser &&
+                                            message.likedBy.includes(
+                                              firebaseUser.uid
+                                            )
+                                              ? "text-red-500"
                                               : "hover:text-red-500"
                                           }`}
                                         >
@@ -2052,7 +2570,8 @@ const playPrevious = () => {
                                   <div className="text-center py-8">
                                     <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                     <p className="text-gray-600 dark:text-gray-300">
-                                      No messages yet. Be the first to share your thoughts!
+                                      No messages yet. Be the first to share
+                                      your thoughts!
                                     </p>
                                   </div>
                                 )}
@@ -2065,7 +2584,9 @@ const playPrevious = () => {
                             onOpenChange={(open) => {
                               if (!firebaseUser && open) {
                                 setShowSignIn(true);
-                                toast.info("Please sign in to share your message");
+                                toast.info(
+                                  "Please sign in to share your message"
+                                );
                                 return;
                               }
                               setSelectedSongForMessage(open ? song.id : null);
@@ -2079,7 +2600,9 @@ const playPrevious = () => {
                                   if (!firebaseUser) {
                                     e.preventDefault();
                                     setShowSignIn(true);
-                                    toast.info("Please sign in to share your message");
+                                    toast.info(
+                                      "Please sign in to share your message"
+                                    );
                                   }
                                 }}
                               >
@@ -2089,9 +2612,12 @@ const playPrevious = () => {
                             </DialogTrigger>
                             <DialogContent>
                               <DialogHeader>
-                                <DialogTitle>Share Your Anonymous Message</DialogTitle>
+                                <DialogTitle>
+                                  Share Your Anonymous Message
+                                </DialogTitle>
                                 <DialogDescription>
-                                  Express what this song means to you. Your message will be completely anonymous.
+                                  Express what this song means to you. Your
+                                  message will be completely anonymous.
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 mt-4">
@@ -2116,7 +2642,8 @@ const playPrevious = () => {
                                       Message Sent Successfully!
                                     </h3>
                                     <p className="text-gray-600 dark:text-gray-300">
-                                      Your anonymous message has been shared with the community.
+                                      Your anonymous message has been shared
+                                      with the community.
                                     </p>
                                   </div>
                                 ) : (
@@ -2124,15 +2651,24 @@ const playPrevious = () => {
                                     <Textarea
                                       placeholder="What does this song make you feel? Share your story, your unsent message, or what this moment means to you..."
                                       value={newMessage}
-                                      onChange={(e) => setNewMessage(e.target.value)}
+                                      onChange={(e) =>
+                                        setNewMessage(e.target.value)
+                                      }
                                       className="min-h-[120px]"
                                     />
                                     <div className="flex justify-end gap-2">
-                                      <Button variant="outline" onClick={() => setSelectedSongForMessage(null)}>
+                                      <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                          setSelectedSongForMessage(null)
+                                        }
+                                      >
                                         Cancel
                                       </Button>
                                       <Button
-                                        onClick={() => addAnonymousMessage(song.id)}
+                                        onClick={() =>
+                                          addAnonymousMessage(song.id)
+                                        }
                                         disabled={!newMessage.trim()}
                                         className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                                       >
@@ -2155,8 +2691,8 @@ const playPrevious = () => {
                         alt={`${song.title} cover`}
                         className="w-20 h-20 rounded-lg object-cover"
                         onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?height=300&width=300"
+                          const target = e.target as HTMLImageElement;
+                          target.src = "/placeholder.svg?height=300&width=300";
                         }}
                       />
                       <div className="flex-1 space-y-2">
@@ -2164,14 +2700,19 @@ const playPrevious = () => {
                           <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 line-clamp-1">
                             {song.title}
                           </h3>
-                          <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
+                          <p className="text-gray-600 dark:text-gray-300 line-clamp-1">
+                            {song.artist}
+                          </p>
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {song.mood.slice(0, 3).map((mood) => (
                             <Badge
                               key={mood}
                               variant="secondary"
-                              className={`text-xs ${moodColors[mood as keyof typeof moodColors] || "bg-gray-100 text-gray-800"}`}
+                              className={`text-xs ${
+                                moodColors[mood as keyof typeof moodColors] ||
+                                "bg-gray-100 text-gray-800"
+                              }`}
                             >
                               {mood}
                             </Badge>
@@ -2196,7 +2737,11 @@ const playPrevious = () => {
                           onClick={() => togglePlayback(song)}
                           disabled={!song.audioUrl}
                         >
-                          {currentlyPlaying === song.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          {currentlyPlaying === song.id ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )}
                         </Button>
                         {song.externalUrl && (
                           <Button
@@ -2221,8 +2766,12 @@ const playPrevious = () => {
         {!isLoading && filteredSongs.length === 0 && (
           <div className="text-center py-12">
             <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No songs found</h3>
-            <p className="text-gray-600 dark:text-gray-300">Try adjusting your search or mood filter.</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              No songs found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
+              Try adjusting your search or mood filter.
+            </p>
           </div>
         )}
       </div>
@@ -2232,7 +2781,9 @@ const playPrevious = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Create New Playlist</DialogTitle>
-            <DialogDescription>Name and describe your new playlist</DialogDescription>
+            <DialogDescription>
+              Name and describe your new playlist
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -2252,12 +2803,20 @@ const playPrevious = () => {
               />
             </div>
           </div>
-          
+
           <div className="flex justify-end gap-2 mt-4">
-            <Button type="button" variant="outline" onClick={() => setShowCreatePlaylist(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowCreatePlaylist(false)}
+            >
               Cancel
             </Button>
-            <Button type="button" onClick={createPlaylist} className="bg-gradient-to-r from-purple-600 to-pink-600">
+            <Button
+              type="button"
+              onClick={createPlaylist}
+              className="bg-gradient-to-r from-purple-600 to-pink-600"
+            >
               Create
             </Button>
           </div>
@@ -2265,35 +2824,47 @@ const playPrevious = () => {
       </Dialog>
 
       <Toaster richColors position="top-center" />
-      
-     <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-2 px-4">
-  <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-1">
-    <div className="flex items-center gap-2">
-      <h2 className="text-lg font-bold text-pink-200">Vibra</h2>
-      <span className="text-xs text-pink-300">Feel it. Share it. Play it.</span>
+
+      <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-2 px-4">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-pink-200">Vibra</h2>
+            <span className="text-xs text-pink-300">
+              Feel it. Share it. Play it.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-pink-200">with 🤍 by Anjali</span>
+            <div className="flex gap-2">
+              <a
+                href="https://www.instagram.com/anjalisinggh_12/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-200 hover:text-white transition-colors"
+              >
+                <FaInstagram className="w-3 h-3" />
+              </a>
+              <a
+                href="https://x.com/anjalisinggh12/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-200 hover:text-blue-300 transition-colors"
+              >
+                <FaTwitter className="w-3 h-3" />
+              </a>
+              <a
+                href="https://github.com/Anjalisinggh"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-pink-200 hover:text-white transition-colors"
+              >
+                <FaGithub className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
-    
-    <div className="flex items-center gap-3">
-      <span className="text-xs text-pink-200">
-      with 🤍 by Anjali 
-      </span>
-      <div className="flex gap-2">
-        <a href="https://www.instagram.com/anjalisinggh_12/" target="_blank" rel="noopener noreferrer"
-          className="text-pink-200 hover:text-white transition-colors">
-          <FaInstagram className="w-3 h-3" />
-        </a>
-        <a href="https://x.com/anjalisinggh12/" target="_blank" rel="noopener noreferrer"
-          className="text-pink-200 hover:text-blue-300 transition-colors">
-          <FaTwitter className="w-3 h-3" />
-        </a>
-        <a href="https://github.com/Anjalisinggh" target="_blank" rel="noopener noreferrer"
-          className="text-pink-200 hover:text-white transition-colors">
-          <FaGithub className="w-3 h-3" />
-        </a>
-      </div>
-    </div>
-  </div>
-</footer>
-    </div>
-  )
+  );
 }
