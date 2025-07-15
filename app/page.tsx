@@ -982,7 +982,7 @@ export default function VibraApp() {
     playSpecificSong(firstSong)
   }
 
-  const playSpecificSong = (song: Song) => {
+const playSpecificSong = (song: Song) => {
   if (currentAudio) {
     currentAudio.pause();
     setCurrentAudio(null);
@@ -1012,7 +1012,6 @@ export default function VibraApp() {
 
     progressInterval.current = setInterval(updateProgress, 1000);
 
-    // Handle seeking
     audio.addEventListener('timeupdate', updateProgress);
 
     audio
@@ -1021,62 +1020,13 @@ export default function VibraApp() {
         setCurrentAudio(audio);
         setCurrentlyPlaying(song.id);
         
-        // Show custom now playing toast
-        toast.custom((t) => (
-          <div className="w-full max-w-md p-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg border dark:border-gray-700">
-            <div className="flex items-center gap-3">
-              <img
-                src={song.coverUrl || "/placeholder.svg"}
-                alt={song.title}
-                className="w-12 h-12 rounded object-cover"
-              />
-              <div className="flex-1 min-w-0">
-                <h4 className="font-semibold truncate">{song.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{song.artist}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  audio.pause();
-                  toast.dismiss(t);
-                }}
-              >
-                <Pause className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="mt-3 space-y-1">
-              <div className="relative group">
-                <Progress 
-                  value={playbackProgress} 
-                  className="h-2 cursor-pointer"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const percent = (e.clientX - rect.left) / rect.width;
-                    const newTime = percent * audio.duration;
-                    audio.currentTime = newTime;
-                    setCurrentTime(newTime);
-                    setPlaybackProgress(percent * 100);
-                  }}
-                />
-                <div 
-                  className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
-                  style={{ width: `${playbackProgress}%` }}
-                />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ left: `calc(${playbackProgress}% - 8px)` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                <span>{formatDuration(currentTime)}</span>
-                <span>{formatDuration(song.duration)}</span>
-              </div>
-            </div>
-          </div>
-        ), {
-          duration: Infinity,
-        });
+        // If playing from playlist, find the current index
+        if (currentPlaylist) {
+          const index = currentPlaylist.songs.findIndex(s => s.id === song.id);
+          if (index >= 0) {
+            setCurrentSongIndex(index);
+          }
+        }
       })
       .catch((error) => {
         console.error("Error playing audio:", error);
@@ -1095,58 +1045,81 @@ export default function VibraApp() {
     toast.error("No audio URL available for this song");
   }
 };
+ const handleSongEnd = () => {
+  if (repeatMode === "one" && currentlyPlaying) {
+    // Replay the same song
+    const song = currentPlaylist 
+      ? currentPlaylist.songs[currentSongIndex]
+      : songs.find(s => s.id === currentlyPlaying);
+    if (song) playSpecificSong(song);
+  } else if (currentPlaylist && currentPlaylist.songs.length > 0) {
+    // Playlist playback logic
+    let nextIndex = currentSongIndex + 1;
 
-  const handleSongEnd = () => {
-    if (repeatMode === "one" && currentPlaylist) {
-      const currentSong = currentPlaylist.songs[currentSongIndex]
-      playSpecificSong(currentSong)
-    } else if (currentPlaylist && currentPlaylist.songs.length > 0) {
-      let nextIndex = currentSongIndex + 1
-
-      if (nextIndex >= currentPlaylist.songs.length) {
-        if (repeatMode === "all") {
-          nextIndex = 0
-        } else {
-          setCurrentlyPlaying(null)
-          setCurrentAudio(null)
-          return
-        }
-      }
-
-      setCurrentSongIndex(nextIndex)
-      const nextSong = currentPlaylist.songs[nextIndex]
-      playSpecificSong(nextSong)
-    } else {
-      setCurrentlyPlaying(null)
-      setCurrentAudio(null)
-    }
-  }
-
-  const playNext = () => {
-    if (!currentPlaylist || currentPlaylist.songs.length === 0) return
-
-    let nextIndex = currentSongIndex + 1
     if (nextIndex >= currentPlaylist.songs.length) {
-      nextIndex = 0
+      if (repeatMode === "all") {
+        nextIndex = 0;
+      } else {
+        setCurrentlyPlaying(null);
+        setCurrentAudio(null);
+        return;
+      }
     }
 
-    setCurrentSongIndex(nextIndex)
-    const nextSong = currentPlaylist.songs[nextIndex]
-    playSpecificSong(nextSong)
+    setCurrentSongIndex(nextIndex);
+    const nextSong = currentPlaylist.songs[nextIndex];
+    playSpecificSong(nextSong);
+  } else {
+    // Single song playback ended
+    setCurrentlyPlaying(null);
+    setCurrentAudio(null);
   }
+};
+const playNext = () => {
+  if (currentPlaylist && currentPlaylist.songs.length > 0) {
+    let nextIndex = currentSongIndex + 1;
+    if (nextIndex >= currentPlaylist.songs.length) {
+      nextIndex = 0;
+    }
+    setCurrentSongIndex(nextIndex);
+    const nextSong = currentPlaylist.songs[nextIndex];
+    playSpecificSong(nextSong);
+  } else if (currentlyPlaying) {
+    // For single song playback, just stop
+    setCurrentlyPlaying(null);
+    if (currentAudio) {
+      currentAudio.pause();
+      setCurrentAudio(null);
+    }
+  }
+};
 
-  const playPrevious = () => {
-    if (!currentPlaylist || currentPlaylist.songs.length === 0) return
-
-    let prevIndex = currentSongIndex - 1
+const playPrevious = () => {
+  if (currentPlaylist && currentPlaylist.songs.length > 0) {
+    let prevIndex = currentSongIndex - 1;
     if (prevIndex < 0) {
-      prevIndex = currentPlaylist.songs.length - 1
+      prevIndex = currentPlaylist.songs.length - 1;
     }
-
-    setCurrentSongIndex(prevIndex)
-    const prevSong = currentPlaylist.songs[prevIndex]
-    playSpecificSong(prevSong)
+    setCurrentSongIndex(prevIndex);
+    const prevSong = currentPlaylist.songs[prevIndex];
+    playSpecificSong(prevSong);
+  } else if (currentlyPlaying) {
+    // For single song playback, restart the song
+    const song = songs.find(s => s.id === currentlyPlaying);
+    if (song) {
+      if (currentAudio) {
+        currentAudio.currentTime = 0;
+        setCurrentTime(0);
+        setPlaybackProgress(0);
+        if (currentAudio.paused) {
+          currentAudio.play();
+        }
+      } else {
+        playSpecificSong(song);
+      }
+    }
   }
+};
 
   const toggleRepeat = () => {
     const modes: ("none" | "one" | "all")[] = ["none", "one", "all"]
@@ -1158,17 +1131,22 @@ export default function VibraApp() {
 
   // Play/Pause audio
   const togglePlayback = (song: Song) => {
-    if (currentlyPlaying === song.id) {
-      if (currentAudio) {
-        currentAudio.pause()
-        setCurrentAudio(null)
-      }
-      setCurrentlyPlaying(null)
-      toast.info(`Paused: ${song.title}`)
-    } else {
-      playSpecificSong(song)
+  if (currentlyPlaying === song.id) {
+    // Pause current song
+    if (currentAudio) {
+      currentAudio.pause();
+      setCurrentAudio(null);
     }
+    setCurrentlyPlaying(null);
+    toast.info(`Paused: ${song.title}`);
+  } else {
+    // Play new song - clear playlist context if playing individual song
+    if (!currentPlaylist || !currentPlaylist.songs.some(s => s.id === song.id)) {
+      setCurrentPlaylist(null);
+    }
+    playSpecificSong(song);
   }
+};
 
   // Open external link
   const openExternalLink = (url: string) => {
@@ -1696,42 +1674,72 @@ export default function VibraApp() {
       </header>
 
       {/* Now Playing Bar */}
-{currentlyPlaying && currentPlaylist && (
+{/* Now Playing Bar - Embedded Below Navbar */}
+{(currentlyPlaying || (currentPlaylist && currentPlaylist.songs.length > 0)) && (
   <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
     <div className="container mx-auto">
       <div className="flex items-center justify-between gap-4">
+        {/* Song Info */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <img
-            src={currentPlaylist.songs[currentSongIndex]?.coverUrl || "/placeholder.svg"}
+            src={
+              currentPlaylist 
+                ? currentPlaylist.songs[currentSongIndex]?.coverUrl 
+                : songs.find(s => s.id === currentlyPlaying)?.coverUrl || "/placeholder.svg"
+            }
             alt="Now playing"
             className="w-12 h-12 rounded object-cover"
           />
           <div className="min-w-0">
-            <h4 className="font-semibold text-sm truncate">{currentPlaylist.songs[currentSongIndex]?.title}</h4>
+            <h4 className="font-semibold text-sm truncate">
+              {currentPlaylist 
+                ? currentPlaylist.songs[currentSongIndex]?.title
+                : songs.find(s => s.id === currentlyPlaying)?.title}
+            </h4>
             <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
-              {currentPlaylist.songs[currentSongIndex]?.artist}
+              {currentPlaylist 
+                ? currentPlaylist.songs[currentSongIndex]?.artist
+                : songs.find(s => s.id === currentlyPlaying)?.artist}
             </p>
           </div>
         </div>
 
+        {/* Player Controls */}
         <div className="flex-1 max-w-md">
           <div className="flex items-center justify-center gap-2">
-            <Button variant="ghost" size="sm" onClick={playPrevious}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={playPrevious}
+              disabled={!currentPlaylist || currentPlaylist.songs.length <= 1}
+            >
               <SkipBack className="h-4 w-4" />
             </Button>
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => togglePlayback(currentPlaylist.songs[currentSongIndex])}
+              onClick={() => {
+                if (currentPlaylist) {
+                  togglePlayback(currentPlaylist.songs[currentSongIndex]);
+                } else {
+                  const song = songs.find(s => s.id === currentlyPlaying);
+                  if (song) togglePlayback(song);
+                }
+              }}
             >
               {currentlyPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
-            <Button variant="ghost" size="sm" onClick={playNext}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={playNext}
+              disabled={!currentPlaylist || currentPlaylist.songs.length <= 1}
+            >
               <SkipForward className="h-4 w-4" />
             </Button>
           </div>
           
-          {/* Seekable Progress Bar */}
+          {/* Progress Bar */}
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
               {formatDuration(currentTime)}
@@ -1755,17 +1763,18 @@ export default function VibraApp() {
                 className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
                 style={{ width: `${playbackProgress}%` }}
               />
-              <div
-                className="absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ left: `calc(${playbackProgress}% - 8px)` }}
-              />
             </div>
             <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
-              {formatDuration(currentPlaylist.songs[currentSongIndex]?.duration || 0)}
+              {formatDuration(
+                currentPlaylist 
+                  ? currentPlaylist.songs[currentSongIndex]?.duration || 0
+                  : songs.find(s => s.id === currentlyPlaying)?.duration || 0
+              )}
             </span>
           </div>
         </div>
 
+        {/* Additional Controls */}
         <div className="flex items-center gap-2 flex-1 justify-end">
           <Button 
             variant="ghost" 
@@ -1780,58 +1789,11 @@ export default function VibraApp() {
               </span>
             )}
           </Button>
-          <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
-            {currentSongIndex + 1} / {currentPlaylist.songs.length}
-          </span>
-          
-          {/* Playlist Dropdown */}
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <ListMusic className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Playlist: {currentPlaylist.name}</DialogTitle>
-                <DialogDescription>
-                  {currentPlaylist.songs.length} songs • {formatDuration(
-                    currentPlaylist.songs.reduce((total, song) => total + song.duration, 0)
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-[60vh] overflow-y-auto space-y-2 mt-4">
-                {currentPlaylist.songs.map((song, index) => (
-                  <div 
-                    key={song.id} 
-                    className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${index === currentSongIndex ? 'bg-purple-50 dark:bg-purple-900/30' : ''}`}
-                    onClick={() => {
-                      setCurrentSongIndex(index);
-                      playSpecificSong(song);
-                    }}
-                  >
-                    <img
-                      src={song.coverUrl || "/placeholder.svg"}
-                      alt={song.title}
-                      className="w-10 h-10 rounded object-cover"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm truncate">{song.title}</h4>
-                      <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{song.artist}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">
-                        {formatDuration(song.duration)}
-                      </span>
-                      {index === currentSongIndex && (
-                        <Volume2 className="h-4 w-4 text-purple-600" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
+          {currentPlaylist && (
+            <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
+              {currentSongIndex + 1} / {currentPlaylist.songs.length}
+            </span>
+          )}
         </div>
       </div>
     </div>
