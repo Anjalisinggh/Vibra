@@ -100,7 +100,7 @@ interface Song {
   messages: AnonymousMessage[]
   plays: number
   duration: number
-  source: "saavn"
+  source: "saavn" | "youtube"
   primaryArtists?: string
 }
 
@@ -494,45 +494,109 @@ export default function VibraApp() {
     }
   }
 
+  // Function to fetch music from YouTube API
+  const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
+    try {
+      const res = await fetch(
+        `https://v1.nocodeapi.com/anjalii1223/yt/TQzqNLsXCDaFUJUv/search?q=${encodeURIComponent(query)}`,
+      )
+      const data = await res.json()
+      if (data.items) {
+        const youtubeSongs: Song[] = []
+        for (const item of data.items) {
+          // Filter for music videos using heuristics
+          const isMusicVideo =
+            item.id.kind === "youtube#video" &&
+            (item.snippet.channelTitle.toLowerCase().includes("vevo") ||
+              item.snippet.channelTitle.toLowerCase().includes("official artist channel") ||
+              item.snippet.title.toLowerCase().includes("official audio") ||
+              item.snippet.title.toLowerCase().includes("music video") ||
+              item.snippet.title.toLowerCase().includes("lyrics") ||
+              item.snippet.description.toLowerCase().includes("official music video"))
+
+          if (isMusicVideo) {
+            const artist = item.snippet.channelTitle || "Unknown Artist"
+            const moods = assignMoodToSong(item.snippet.title, artist)
+            const emotion = getPrimaryEmotion(moods)
+            youtubeSongs.push({
+              id: `youtube_${item.id.videoId}`,
+              title: item.snippet.title,
+              artist: artist,
+              primaryArtists: artist,
+              mood: moods,
+              emotion: emotion,
+              coverUrl: item.snippet.thumbnails.high.url || "/placeholder.svg?height=300&width=300",
+              audioUrl: "", // YouTube API does not provide direct audio URLs
+              previewUrl: "",
+              externalUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+              messages: [],
+              plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder plays
+              duration: 240, // Placeholder duration, YouTube search API doesn't provide it
+              source: "youtube",
+            })
+          }
+        }
+        return youtubeSongs.slice(0, 20) // Limit results
+      }
+      return []
+    } catch (error) {
+      console.error("Error fetching YouTube music:", error)
+      return []
+    }
+  }
+
   // Function to fetch a song by ID
   const fetchSongById = async (id: string): Promise<Song | null> => {
-    try {
-      const saavnId = id.replace("saavn_", "")
-      const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`)
-      const data = await res.json()
-      if (data.success && data.data && data.data.length > 0) {
-        const saavnSong = data.data[0]
-        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
-        const moods = assignMoodToSong(saavnSong.name, artist)
-        const emotion = getPrimaryEmotion(moods)
-        return {
-          id: `saavn_${saavnSong.id}`,
-          title: saavnSong.name,
-          artist: artist,
-          primaryArtists: artist,
-          mood: moods,
-          emotion: emotion,
-          coverUrl:
-            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
-            saavnSong.image?.[saavnSong.image.length - 1]?.url ||
-            "/placeholder.svg?height=300&width=300",
-          audioUrl:
-            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
-            saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
-            "",
-          previewUrl: "",
-          externalUrl: saavnSong.url || "",
-          messages: allMessages.filter((msg) => msg.songId === `saavn_${saavnSong.id}`),
-          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
-          duration: saavnSong.duration || 180,
-          source: "saavn",
+    if (id.startsWith("saavn_")) {
+      try {
+        const saavnId = id.replace("saavn_", "")
+        const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`)
+        const data = await res.json()
+        if (data.success && data.data && data.data.length > 0) {
+          const saavnSong = data.data[0]
+          const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
+          const moods = assignMoodToSong(saavnSong.name, artist)
+          const emotion = getPrimaryEmotion(moods)
+          return {
+            id: `saavn_${saavnSong.id}`,
+            title: saavnSong.name,
+            artist: artist,
+            primaryArtists: artist,
+            mood: moods,
+            emotion: emotion,
+            coverUrl:
+              saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+              saavnSong.image?.[saavnSong.image.length - 1]?.url ||
+              "/placeholder.svg?height=300&width=300",
+            audioUrl:
+              saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+              saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
+              "",
+            previewUrl: "",
+            externalUrl: saavnSong.url || "",
+            messages: allMessages.filter((msg) => msg.songId === `saavn_${saavnSong.id}`),
+            plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+            duration: saavnSong.duration || 180,
+            source: "saavn",
+          }
         }
+      } catch (error) {
+        console.error("Error fetching Saavn song by ID:", error)
       }
-      return null
-    } catch (error) {
-      console.error("Error fetching song by ID:", error)
-      return null
+    } else if (id.startsWith("youtube_")) {
+      // For YouTube songs, we don't have a direct "get by ID" endpoint for full details
+      // We can try to reconstruct it if needed, but for now, assume it's in `allMessages`
+      const youtubeId = id.replace("youtube_", "")
+      // This is a simplified reconstruction, as the nocodeapi doesn't have a direct song endpoint
+      // In a real app, you'd need to store more metadata or use a different YouTube API endpoint
+      const messageForSong = allMessages.find((msg) => msg.songId === id)
+      if (messageForSong) {
+        // Try to find the song in the current songs array
+        const existingSong = songs.find((s) => s.id === id)
+        if (existingSong) return existingSong
+      }
     }
+    return null
   }
 
   // Fallback songs when APIs fail
@@ -617,17 +681,35 @@ export default function VibraApp() {
       ]
       const allSongs: Song[] = []
       // Fetch from Saavn API
-      const fetchPromises = queries.map(async (query) => {
+      const saavnPromises = queries.map(async (query) => {
         try {
           const songs = await fetchSaavnSongs(query)
           return songs
         } catch (error) {
-          console.error(`Failed to fetch songs for query "${query}":`, error)
+          console.error(`Failed to fetch Saavn songs for query "${query}":`, error)
           return []
         }
       })
-      const results = await Promise.all(fetchPromises)
-      results.forEach((songs) => allSongs.push(...songs))
+      const saavnResults = await Promise.all(saavnPromises)
+      saavnResults.forEach((songs) => allSongs.push(...songs))
+
+      // If Saavn didn't return enough songs, try YouTube
+      if (allSongs.length < 50) {
+        // Threshold for trying YouTube
+        const youtubeQueries = ["popular english songs", "bollywood music", "trending music videos"]
+        const youtubePromises = youtubeQueries.map(async (query) => {
+          try {
+            const songs = await fetchYouTubeMusic(query)
+            return songs
+          } catch (error) {
+            console.error(`Failed to fetch YouTube music for query "${query}":`, error)
+            return []
+          }
+        })
+        const youtubeResults = await Promise.all(youtubePromises)
+        youtubeResults.forEach((songs) => allSongs.push(...songs))
+      }
+
       // If no songs were fetched, use fallback
       if (allSongs.length === 0) {
         allSongs.push(...getFallbackSongs(""))
@@ -654,8 +736,19 @@ export default function VibraApp() {
     }
     setIsLoading(true)
     try {
-      const results = await fetchSaavnSongs(searchQuery)
-      // Also search messages
+      const results: Song[] = []
+
+      // 1. Try Saavn first
+      const saavnResults = await fetchSaavnSongs(searchQuery)
+      results.push(...saavnResults)
+
+      // 2. If Saavn yields no results, try YouTube
+      if (results.length === 0) {
+        const youtubeResults = await fetchYouTubeMusic(searchQuery)
+        results.push(...youtubeResults)
+      }
+
+      // Also search messages (this part remains the same)
       const messagesSnapshot = await getDocs(
         query(
           collection(db, "messages"),
@@ -692,10 +785,21 @@ export default function VibraApp() {
     try {
       const queries = moodQueries[mood as keyof typeof moodQueries] || [mood]
       const allSongs: Song[] = []
+      // Try Saavn first
       for (const query of queries.slice(0, 3)) {
         const songs = await fetchSaavnSongs(query)
         allSongs.push(...songs)
       }
+
+      // If Saavn didn't return enough songs, try YouTube
+      if (allSongs.length < 20) {
+        // Threshold for trying YouTube
+        for (const query of queries.slice(0, 3)) {
+          const songs = await fetchYouTubeMusic(query)
+          allSongs.push(...songs)
+        }
+      }
+
       if (allSongs.length === 0) {
         const fallbackSongs = getFallbackSongs("").filter((song) => song.mood.includes(mood))
         allSongs.push(...fallbackSongs)
