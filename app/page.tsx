@@ -55,6 +55,7 @@ import {
   User,
   Trash2,
   Menu,
+  ArrowUp,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
@@ -218,6 +219,7 @@ export default function VibraApp() {
   const [currentTime, setCurrentTime] = useState(0)
   const progressInterval = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
+  const [showScrollToTop, setShowScrollToTop] = useState(false) // New state for scroll to top button
 
   // Toggle dark mode
   useEffect(() => {
@@ -321,6 +323,29 @@ export default function VibraApp() {
       })
     }
   }, [])
+
+  // Scroll to top button visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 200) {
+        setShowScrollToTop(true)
+      } else {
+        setShowScrollToTop(false)
+      }
+    }
+
+    window.addEventListener("scroll", handleScroll)
+    return () => {
+      window.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+  }
 
   // Function to assign mood based on song title and artist
   const assignMoodToSong = (title: string, artist: string): string[] => {
@@ -2309,6 +2334,17 @@ export default function VibraApp() {
           </div>
         </div>
       </footer>
+      {showScrollToTop && (
+        <Button
+          variant="secondary"
+          size="icon"
+          className="fixed bottom-4 right-4 rounded-full shadow-lg bg-purple-600 text-white hover:bg-purple-700 transition-opacity duration-300 z-50"
+          onClick={scrollToTop}
+          aria-label="Scroll to top"
+        >
+          <ArrowUp className="h-5 w-5" />
+        </Button>
+      )}
     </div>
   )
 }
