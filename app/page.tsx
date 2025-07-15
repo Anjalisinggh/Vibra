@@ -925,6 +925,7 @@ export default function VibraApp() {
     setCurrentSongIndex(0)
     const firstSong = playlist.songs[0]
     playSpecificSong(firstSong)
+    setShowPlaylists(false) // Close the playlist dialog after playing
   }
 
   const playSpecificSong = (song: Song) => {
@@ -1174,7 +1175,7 @@ export default function VibraApp() {
                         <span className="ml-2 hidden md:inline">Playlists ({playlists.length})</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogContent className="w-full h-full max-w-full sm:max-w-4xl sm:max-h-[80vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle className="flex items-center justify-between">
                           <span>Your Playlists</span>
@@ -1185,7 +1186,7 @@ export default function VibraApp() {
                         </DialogTitle>
                         <DialogDescription>Manage your custom playlists</DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 mt-4">
+                      <div className="space-y-4 mt-4 flex-1 overflow-y-auto">
                         {playlists.length === 0 ? (
                           <div className="text-center py-8">
                             <ListMusic className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -1212,7 +1213,6 @@ export default function VibraApp() {
                                   <Button
                                     onClick={() => {
                                       playPlaylist(playlist)
-                                      setShowPlaylists(false)
                                     }}
                                     disabled={playlist.songs.length === 0}
                                     size="sm"
@@ -1247,6 +1247,7 @@ export default function VibraApp() {
                                         }
                                         setCurrentSongIndex(index)
                                         playSpecificSong(song)
+                                        setShowPlaylists(false) // Close dialog when a song from playlist is played
                                       }}
                                     >
                                       <img
