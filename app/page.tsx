@@ -1289,7 +1289,18 @@ export default function VibraApp() {
       setCurrentAudio(null);
     }
   };
- const playNext = () => {
+const playNext = () => {
+  if (currentAudio) {
+    // If we're at the end of the song and user clicks next, handle accordingly
+    if (currentAudio.currentTime >= currentAudio.duration - 1) {
+      currentAudio.currentTime = 0;
+      currentAudio.pause();
+      setCurrentlyPlaying(null);
+      setCurrentAudio(null);
+      return;
+    }
+  }
+
   if (currentPlaylist && currentPlaylist.songs.length > 0) {
     // Playlist playback logic
     let nextIndex = currentSongIndex + 1;
@@ -1299,7 +1310,10 @@ export default function VibraApp() {
         nextIndex = 0;
       } else {
         setCurrentlyPlaying(null);
-        setCurrentAudio(null);
+        if (currentAudio) {
+          currentAudio.pause();
+          setCurrentAudio(null);
+        }
         return;
       }
     }
@@ -1310,6 +1324,7 @@ export default function VibraApp() {
   } else if (currentlyPlaying) {
     // Non-playlist playback logic - play next song in filtered songs
     const currentIndex = filteredSongs.findIndex(s => s.id === currentlyPlaying);
+    
     if (currentIndex >= 0 && currentIndex < filteredSongs.length - 1) {
       const nextSong = filteredSongs[currentIndex + 1];
       playSpecificSong(nextSong);
@@ -1329,6 +1344,12 @@ export default function VibraApp() {
 };
 
 const playPrevious = () => {
+  if (currentAudio && currentAudio.currentTime > 3) {
+    // If we're more than 3 seconds into the song, just restart it
+    currentAudio.currentTime = 0;
+    return;
+  }
+
   if (currentPlaylist && currentPlaylist.songs.length > 0) {
     // Playlist playback logic
     let prevIndex = currentSongIndex - 1;
@@ -1337,12 +1358,12 @@ const playPrevious = () => {
       if (repeatMode === "all") {
         prevIndex = currentPlaylist.songs.length - 1;
       } else {
-        // Restart current song if not at beginning
-        if (currentAudio && currentAudio.currentTime > 3) {
-          currentAudio.currentTime = 0;
+        // Restart current song if we're at the beginning
+        const currentSong = currentPlaylist.songs[currentSongIndex];
+        if (currentSong) {
+          playSpecificSong(currentSong);
           return;
         }
-        prevIndex = 0;
       }
     }
     
@@ -1353,13 +1374,6 @@ const playPrevious = () => {
     // Non-playlist playback logic
     const currentIndex = filteredSongs.findIndex(s => s.id === currentlyPlaying);
     
-    // If song has been playing for more than 3 seconds, restart it
-    if (currentAudio && currentAudio.currentTime > 3) {
-      currentAudio.currentTime = 0;
-      return;
-    }
-    
-    // Otherwise go to previous song
     if (currentIndex > 0) {
       const prevSong = filteredSongs[currentIndex - 1];
       playSpecificSong(prevSong);
@@ -1367,6 +1381,12 @@ const playPrevious = () => {
       // If at beginning and repeat all is on, go to last song
       const lastSong = filteredSongs[filteredSongs.length - 1];
       if (lastSong) playSpecificSong(lastSong);
+    } else {
+      // Restart current song if we're at the beginning
+      const currentSong = filteredSongs[currentIndex];
+      if (currentSong) {
+        playSpecificSong(currentSong);
+      }
     }
   }
 };
