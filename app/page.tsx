@@ -398,19 +398,16 @@ const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
 // Function to fetch YouTube music using the YouTube Data API
 const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
   if (!query.trim()) return []
-
   const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
   if (!YOUTUBE_API_KEY) {
     console.warn("NEXT_PUBLIC_YOUTUBE_API_KEY is not set. YouTube search will not function.")
     return []
   }
-
   try {
     const res = await fetch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}&maxResults=10`,
     )
     const data = await res.json()
-
     if (data.items && data.items.length > 0) {
       return data.items
         .filter((item: any) => item.id.videoId) // Ensure it's a video
@@ -420,7 +417,6 @@ const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
           const moods = assignMoodToSong(title, artist)
           const emotion = getPrimaryEmotion(moods)
           const videoId = item.id.videoId
-
           return {
             id: `youtube_${videoId}`,
             title: title,
@@ -492,24 +488,20 @@ const fetchSongById = async (
     try {
       const videoId = id.replace("youtube_", "")
       const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
-
       if (!YOUTUBE_API_KEY) {
         console.warn("NEXT_PUBLIC_YOUTUBE_API_KEY is not set. Cannot fetch YouTube song by ID.")
         return null
       }
-
       const res = await fetch(
         `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`,
       )
       const data = await res.json()
-
       if (data.items && data.items.length > 0) {
         const item = data.items[0]
         const title = item.snippet.title
         const artist = item.snippet.channelTitle || "Unknown Artist"
         const moods = assignMoodToSong(title, artist)
         const emotion = getPrimaryEmotion(moods)
-
         return {
           id: id,
           title: title,
@@ -618,7 +610,6 @@ const getFallbackSongs = (query: string): Song[] => {
       source: "youtube" as const,
     },
   ]
-
   // Filter fallback songs based on query if provided
   if (query && query.trim()) {
     const lowerQuery = query.toLowerCase()
@@ -688,7 +679,6 @@ export default function VibraApp() {
   const [youTubePlayerOpen, setYouTubePlayerOpen] = useState(false)
   const [currentYouTubeVideoId, setCurrentYouTubeVideoId] = useState<string | null>(null)
   const [currentYouTubeSongTitle, setCurrentYouTubeSongTitle] = useState<string | null>(null)
-
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [searchQuery, setSearchQuery] = useState("")
@@ -730,6 +720,32 @@ export default function VibraApp() {
   const router = useRouter()
   const [showScrollToTop, setShowScrollToTop] = useState(false) // New state for scroll to top button
 
+  // New: Ref for the header to measure its height
+  const headerRef = useRef<HTMLElement>(null)
+  const [headerHeight, setHeaderHeight] = useState(0)
+
+  // Effect to measure header height
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        setHeaderHeight(headerRef.current.offsetHeight)
+      }
+    }
+
+    updateHeaderHeight() // Set initial height
+    window.addEventListener("resize", updateHeaderHeight) // Update on resize
+    // Also observe mutations in case content changes height without resize
+    const observer = new MutationObserver(updateHeaderHeight)
+    if (headerRef.current) {
+      observer.observe(headerRef.current, { childList: true, subtree: true, attributes: true })
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateHeaderHeight)
+      observer.disconnect()
+    }
+  }, [mobileMenuOpen]) // Re-run when mobile menu opens/closes
+
   // Toggle dark mode
   useEffect(() => {
     if (isDarkMode) {
@@ -764,7 +780,6 @@ export default function VibraApp() {
     try {
       // 1. First load songs
       const initialSongs = await loadInitialSongs()
-
       // 2. Then load messages
       const messagesRef = collection(db, "messages")
       const q = query(messagesRef, orderBy("timestamp", "desc"))
@@ -782,7 +797,6 @@ export default function VibraApp() {
           likedBy: data.likedBy || [],
         })
       })
-
       // 3. Associate messages with songs before setting state
       const songsWithMessages = initialSongs.map((song) => ({
         ...song,
@@ -790,7 +804,6 @@ export default function VibraApp() {
       }))
       setSongs(songsWithMessages)
       setAllMessages(initialMessages)
-
       // 4. Set up real-time listener
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const updatedMessages: AnonymousMessage[] = []
@@ -1082,7 +1095,6 @@ export default function VibraApp() {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
       if (!playlist) return
-
       const updatedSongs = playlist.songs.filter((s) => s.id !== songId)
       if (playlist.firebaseId) {
         await updateDoc(doc(db, "playlists", playlist.firebaseId), {
@@ -1101,7 +1113,6 @@ export default function VibraApp() {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
       if (!playlist || !playlist.firebaseId) return
-
       await deleteDoc(doc(db, "playlists", playlist.firebaseId))
       setPlaylists((prev) => prev.filter((p) => p.id !== playlistId))
       toast.success(`Playlist "${playlist.name}" deleted`)
@@ -1119,8 +1130,8 @@ export default function VibraApp() {
       toast.info("Please sign in to share your message")
       return
     }
-    if (!newMessage.trim()) return
 
+    if (!newMessage.trim()) return
     try {
       const emotion = analyzeSentiment(newMessage)
       const messageData = {
@@ -1209,6 +1220,7 @@ export default function VibraApp() {
     if (song.audioUrl && song.source === "saavn") {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
+
       // Set initial progress
       setCurrentTime(0)
       setPlaybackProgress(0)
@@ -1260,7 +1272,6 @@ export default function VibraApp() {
   const handleSongEnd = () => {
     // This function is only called by HTMLAudioElement.onended, so it only applies to Saavn songs.
     const activeSong = songs.find((s) => s.id === currentlyPlaying) || currentPlaylist?.songs[currentSongIndex]
-
     if (!activeSong || activeSong.source !== "saavn" || !activeSong.audioUrl) {
       // Ensure it's an audio song that actually ended
       setCurrentlyPlaying(null)
@@ -1383,6 +1394,7 @@ export default function VibraApp() {
       clearInterval(progressInterval.current)
       progressInterval.current = null
     }
+
     // Always close YouTube player if a new song is selected or the same YouTube song is clicked to stop
     if (youTubePlayerOpen) {
       setYouTubePlayerOpen(false)
@@ -1403,6 +1415,7 @@ export default function VibraApp() {
     if (song.source === "saavn" && song.audioUrl) {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
+
       setCurrentTime(0)
       setPlaybackProgress(0)
 
@@ -1446,7 +1459,6 @@ export default function VibraApp() {
       // For YouTube videos, open the dialog using the direct embed URL
       const videoIdMatch = song.audioUrl.match(/\/embed\/([^?]+)/)
       const videoId = videoIdMatch ? videoIdMatch[1] : null
-
       if (videoId) {
         setCurrentYouTubeVideoId(videoId)
         setCurrentYouTubeSongTitle(song.title)
@@ -1456,7 +1468,6 @@ export default function VibraApp() {
         toast.error("Invalid YouTube video URL.")
         setCurrentlyPlaying(null)
       }
-
       setCurrentTime(0)
       setPlaybackProgress(0)
       if (currentPlaylist) {
@@ -1523,9 +1534,14 @@ export default function VibraApp() {
   const moodFilters = [{ key: "love", label: "Love & Romance", icon: "💕" }]
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? "dark bg-gray-900" : "bg-gray-50"}`}>
+    <div
+      className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "dark bg-gray-900" : "bg-gray-50"}`}
+    >
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-gray-800/95 dark:border-gray-800">
+      <header
+        ref={headerRef}
+        className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-gray-800/95 dark:border-gray-800"
+      >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1539,14 +1555,12 @@ export default function VibraApp() {
                 Feel the music, speak the unspoken.
               </p>
             </div>
-
             {/* Mobile Menu Button */}
             <div className="flex items-center gap-2 sm:hidden">
               <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
                 <Menu className="h-5 w-5" />
               </Button>
             </div>
-
             {/* Desktop Navigation */}
             <div className="hidden sm:flex items-center gap-2">
               {user ? (
@@ -1662,7 +1676,6 @@ export default function VibraApp() {
                       </div>
                     </DialogContent>
                   </Dialog>
-
                   <Dialog open={showProfile} onOpenChange={setShowProfile}>
                     <DialogTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -1792,7 +1805,6 @@ export default function VibraApp() {
                       </form>
                     </DialogContent>
                   </Dialog>
-
                   <Dialog open={showSignUp} onOpenChange={setShowSignUp}>
                     <DialogTrigger asChild>
                       <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600">
@@ -2008,671 +2020,672 @@ export default function VibraApp() {
       </header>
 
       {/* Now Playing Bar */}
-      {currentlyPlaying && ( // Only show if something is marked as playing
-        <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
-          <div className="container mx-auto">
-            <div className="flex items-center justify-between gap-4">
-              {/* Song Info */}
-              {(() => {
-                const activeSong = currentPlaylist
-                  ? currentPlaylist.songs[currentSongIndex]
-                  : songs.find((s) => s.id === currentlyPlaying)
-
-                if (!activeSong) return null // Should not happen if currentlyPlaying is set correctly
-
-                return (
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <img
-                      src={activeSong.coverUrl || "/placeholder.svg"}
-                      alt={`${activeSong.title} cover`}
-                      className="w-12 h-12 rounded object-cover"
-                    />
-                    <div className="min-w-0">
-                      <h4 className="font-semibold text-sm truncate">{activeSong.title}</h4>
-                      <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{activeSong.artist}</p>
+      {currentlyPlaying &&
+        headerHeight > 0 && ( // Only show if something is marked as playing and header height is known
+          <div
+            className="sticky z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2"
+            style={{ top: `${headerHeight}px` }} // Dynamically set top based on header height
+          >
+            <div className="container mx-auto">
+              <div className="flex items-center justify-between gap-4">
+                {/* Song Info */}
+                {(() => {
+                  const activeSong = currentPlaylist
+                    ? currentPlaylist.songs[currentSongIndex]
+                    : songs.find((s) => s.id === currentlyPlaying)
+                  if (!activeSong) return null // Should not happen if currentlyPlaying is set correctly
+                  return (
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <img
+                        src={activeSong.coverUrl || "/placeholder.svg"}
+                        alt={`${activeSong.title} cover`}
+                        className="w-12 h-12 rounded object-cover"
+                      />
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-sm truncate">{activeSong.title}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{activeSong.artist}</p>
+                      </div>
                     </div>
-                  </div>
-                )
-              })()}
-
-              {/* Player Controls */}
-              {(() => {
-                const activeSong = currentPlaylist
-                  ? currentPlaylist.songs[currentSongIndex]
-                  : songs.find((s) => s.id === currentlyPlaying)
-
-                if (!activeSong) return null
-
-                const isYouTube = activeSong.source === "youtube"
-                const isAudioPlaying = currentAudio && !currentAudio.paused
-
-                return (
-                  <div className="flex-1 max-w-md">
-                    <div className="flex items-center justify-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={playPrevious} disabled={isYouTube}>
-                        <SkipBack className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          if (isYouTube) {
-                            setYouTubePlayerOpen(!youTubePlayerOpen) // Toggle YouTube dialog
-                          } else {
-                            if (currentAudio) {
-                              if (isAudioPlaying) {
-                                currentAudio.pause()
-                              } else {
-                                currentAudio.play()
+                  )
+                })()}
+                {/* Player Controls */}
+                {(() => {
+                  const activeSong = currentPlaylist
+                    ? currentPlaylist.songs[currentSongIndex]
+                    : songs.find((s) => s.id === currentlyPlaying)
+                  if (!activeSong) return null
+                  const isYouTube = activeSong.source === "youtube"
+                  const isAudioPlaying = currentAudio && !currentAudio.paused
+                  return (
+                    <div className="flex-1 max-w-md">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={playPrevious} disabled={isYouTube}>
+                          <SkipBack className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (isYouTube) {
+                              setYouTubePlayerOpen(!youTubePlayerOpen) // Toggle YouTube dialog
+                            } else {
+                              if (currentAudio) {
+                                if (isAudioPlaying) {
+                                  currentAudio.pause()
+                                } else {
+                                  currentAudio.play()
+                                }
                               }
                             }
-                          }
-                        }}
-                      >
-                        {isYouTube ? (
-                          youTubePlayerOpen ? (
+                          }}
+                        >
+                          {isYouTube ? (
+                            youTubePlayerOpen ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )
+                          ) : isAudioPlaying ? (
                             <Pause className="h-4 w-4" />
                           ) : (
                             <Play className="h-4 w-4" />
-                          )
-                        ) : isAudioPlaying ? (
-                          <Pause className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={playNext} disabled={isYouTube}>
+                          <SkipForward className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {/* Progress Bar */}
+                      <div className="flex items-center gap-2 mt-1">
+                        {isYouTube ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 w-full text-center">
+                            YouTube content
+                          </span>
                         ) : (
-                          <Play className="h-4 w-4" />
+                          <>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
+                              {formatDuration(currentTime)}
+                            </span>
+                            <div className="flex-1 relative group">
+                              <Progress
+                                value={playbackProgress}
+                                className="h-2 cursor-pointer"
+                                onClick={(e) => {
+                                  if (currentAudio) {
+                                    const rect = e.currentTarget.getBoundingClientRect()
+                                    const percent = (e.clientX - rect.left) / rect.width
+                                    const newTime = percent * currentAudio.duration
+                                    currentAudio.currentTime = newTime
+                                    setCurrentTime(newTime)
+                                    setPlaybackProgress(percent * 100)
+                                  }
+                                }}
+                              />
+                              <div
+                                className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
+                                style={{ width: `${playbackProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
+                              {formatDuration(activeSong.duration || 0)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+                {/* Additional Controls */}
+                {(() => {
+                  const activeSong = currentPlaylist
+                    ? currentPlaylist.songs[currentSongIndex]
+                    : songs.find((s) => s.id === currentlyPlaying)
+                  if (!activeSong) return null
+                  const isYouTube = activeSong.source === "youtube"
+                  return (
+                    <div className="flex items-center gap-2 flex-1 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleRepeat}
+                        className={repeatMode !== "none" ? "text-purple-600" : ""}
+                        disabled={isYouTube} // Disable repeat for YouTube
+                      >
+                        <Repeat className="h-4 w-4" />
+                        {repeatMode === "one" && (
+                          <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                            1
+                          </span>
                         )}
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={playNext} disabled={isYouTube}>
-                        <SkipForward className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {/* Progress Bar */}
-                    <div className="flex items-center gap-2 mt-1">
-                      {isYouTube ? (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 w-full text-center">
-                          YouTube content
-                        </span>
-                      ) : (
-                        <>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
-                            {formatDuration(currentTime)}
-                          </span>
-                          <div className="flex-1 relative group">
-                            <Progress
-                              value={playbackProgress}
-                              className="h-2 cursor-pointer"
-                              onClick={(e) => {
-                                if (currentAudio) {
-                                  const rect = e.currentTarget.getBoundingClientRect()
-                                  const percent = (e.clientX - rect.left) / rect.width
-                                  const newTime = percent * currentAudio.duration
-                                  currentAudio.currentTime = newTime
-                                  setCurrentTime(newTime)
-                                  setPlaybackProgress(percent * 100)
-                                }
-                              }}
-                            />
-                            <div
-                              className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
-                              style={{ width: `${playbackProgress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
-                            {formatDuration(activeSong.duration || 0)}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* Additional Controls */}
-              {(() => {
-                const activeSong = currentPlaylist
-                  ? currentPlaylist.songs[currentSongIndex]
-                  : songs.find((s) => s.id === currentlyPlaying)
-
-                if (!activeSong) return null
-                const isYouTube = activeSong.source === "youtube"
-
-                return (
-                  <div className="flex items-center gap-2 flex-1 justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleRepeat}
-                      className={repeatMode !== "none" ? "text-purple-600" : ""}
-                      disabled={isYouTube} // Disable repeat for YouTube
-                    >
-                      <Repeat className="h-4 w-4" />
-                      {repeatMode === "one" && (
-                        <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                          1
+                      {currentPlaylist && (
+                        <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
+                          {currentSongIndex + 1} / {currentPlaylist.songs.length}
                         </span>
                       )}
-                    </Button>
-                    {currentPlaylist && (
-                      <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
-                        {currentSongIndex + 1} / {currentPlaylist.songs.length}
-                      </span>
-                    )}
-                  </div>
-                )
-              })()}
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      <div className="container mx-auto px-4 py-8">
-        {/* Hero Section */}
-        <div className="text-center mb-12">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
-              Where your emotions meet their soundtrack
-            </h2>
-          </div>
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <span className="italic">
-              "Every song tells a story, every story finds its song - especially those love and romance melodies that
-              speak to the heart"
-            </span>
-            <Heart className="h-4 w-4 text-pink-500" />
-          </div>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="mb-8 space-y-4">
-          <div className="relative max-w-2xl mx-auto flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input
-                placeholder="Search by song name, artist, or emotion..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-12 h-14 text-lg rounded-full border-2 focus:border-purple-500"
-              />
-            </div>
-            <Button
-              onClick={handleSearch}
-              className="h-14 px-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-            </Button>
-          </div>
-
-          {/* Mood Filter Buttons */}
-          <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
-            <Button
-              variant={selectedMood === "" ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleMoodFilter("")}
-              className={selectedMood === "" ? "bg-gradient-to-r from-purple-600 to-pink-600" : ""}
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              All Moods
-            </Button>
-            {moodFilters.map((mood) => (
-              <Button
-                key={mood.key}
-                variant={selectedMood === mood.key ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleMoodFilter(mood.key)}
-                className={
-                  selectedMood === mood.key
-                    ? "bg-gradient-to-r from-purple-600 to-pink-600"
-                    : "hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                }
-              >
-                <span className="mr-1">{mood.icon}</span>
-                {mood.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="text-center py-12">
-            <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
-            <p className="text-gray-600 dark:text-gray-300">Finding tracks </p>
           </div>
         )}
 
-        {/* Songs Grid/List */}
-        {!isLoading && (
-          <div
-            className={`${
-              viewMode === "grid"
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                : "space-y-4 max-w-4xl mx-auto"
-            }`}
-          >
-            {filteredSongs.map((song) => (
-              <Card
-                key={song.id}
-                className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white dark:bg-gray-800/90 border-0 shadow-md overflow-hidden"
+      <main className="flex-1 overflow-auto">
+        {" "}
+        {/* Main content area, takes remaining space and scrolls */}
+        <div className="container mx-auto px-4 py-8">
+          {/* Hero Section */}
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
+                Where your emotions meet their soundtrack
+              </h2>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <span className="italic">
+                "Every song tells a story, every story finds its song - especially those love and romance melodies that
+                speak to the heart"
+              </span>
+              <Heart className="h-4 w-4 text-pink-500" />
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="mb-8 space-y-4">
+            <div className="relative max-w-2xl mx-auto flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  placeholder="Search by song name, artist, or emotion..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                  className="pl-12 h-14 text-lg rounded-full border-2 focus:border-purple-500"
+                />
+              </div>
+              <Button
+                onClick={handleSearch}
+                className="h-14 px-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                disabled={isLoading}
               >
-                <CardContent className="p-0">
-                  {viewMode === "grid" ? (
-                    // Grid View
-                    <div className="space-y-4">
-                      <div className="relative overflow-hidden">
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
+              </Button>
+            </div>
+
+            {/* Mood Filter Buttons */}
+            <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
+              <Button
+                variant={selectedMood === "" ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleMoodFilter("")}
+                className={selectedMood === "" ? "bg-gradient-to-r from-purple-600 to-pink-600" : ""}
+              >
+                <Filter className="h-4 w-4 mr-1" />
+                All Moods
+              </Button>
+              {moodFilters.map((mood) => (
+                <Button
+                  key={mood.key}
+                  variant={selectedMood === mood.key ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleMoodFilter(mood.key)}
+                  className={
+                    selectedMood === mood.key
+                      ? "bg-gradient-to-r from-purple-600 to-pink-600"
+                      : "hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                  }
+                >
+                  <span className="mr-1">{mood.icon}</span>
+                  {mood.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Loading State */}
+          {isLoading && (
+            <div className="text-center py-12">
+              <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
+              <p className="text-gray-600 dark:text-gray-300">Finding tracks </p>
+            </div>
+          )}
+
+          {/* Songs Grid/List */}
+          {!isLoading && (
+            <div
+              className={`${
+                viewMode === "grid"
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                  : "space-y-4 max-w-4xl mx-auto"
+              }`}
+            >
+              {filteredSongs.map((song) => (
+                <Card
+                  key={song.id}
+                  className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white dark:bg-gray-800/90 border-0 shadow-md overflow-hidden"
+                >
+                  <CardContent className="p-0">
+                    {viewMode === "grid" ? (
+                      // Grid View
+                      <div className="space-y-4">
+                        <div className="relative overflow-hidden">
+                          <img
+                            src={song.coverUrl || "/placeholder.svg"}
+                            alt={`${song.title} cover`}
+                            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/placeholder.svg?height=300&width=300"
+                            }}
+                          />
+                          <div className="absolute top-2 right-2 flex gap-1">
+                            {song.externalUrl && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-6 w-6 p-0"
+                                onClick={() => openExternalLink(song.externalUrl)}
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <Button
+                              size="lg"
+                              className="rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 border-2 border-white/50"
+                              onClick={() => togglePlayback(song)}
+                              disabled={!song.audioUrl && song.source !== "youtube"} // Disable if no audio URL and not YouTube
+                            >
+                              {currentlyPlaying === song.id ? (
+                                <Pause className="h-6 w-6 text-white" />
+                              ) : (
+                                <Play className="h-6 w-6 text-white" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          <div>
+                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 group-hover:text-purple-600 transition-colors line-clamp-1">
+                              {song.title}
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {song.mood.slice(0, 3).map((mood) => (
+                              <Badge
+                                key={mood}
+                                variant="secondary"
+                                className={`text-xs ${
+                                  moodColors[mood as keyof typeof moodColors] || "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {mood}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-1">
+                              <Volume2 className="h-4 w-4" />
+                              <span>{song.plays.toLocaleString()} plays</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <MessageCircle className="h-4 w-4" />
+                              <span>{song.messages.length} messages</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            {/* Replace the existing "Add to Playlist" button with this dropdown menu */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="w-48">
+                                <DropdownMenuItem
+                                  onClick={() => togglePlayback(song)}
+                                  disabled={!song.audioUrl && song.source !== "youtube"}
+                                >
+                                  <Play className="h-4 w-4 mr-2" />
+                                  Play Now
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // Implement play next functionality
+                                    toast.info("Added to queue (play next)")
+                                  }}
+                                >
+                                  <SkipForward className="h-4 w-4 mr-2" />
+                                  Play Next
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    // Implement add to queue functionality
+                                    toast.info("Added to queue")
+                                  }}
+                                >
+                                  <ListMusic className="h-4 w-4 mr-2" />
+                                  Add to Queue
+                                </DropdownMenuItem>
+                                {song.audioUrl &&
+                                  song.source !== "youtube" && ( // Disable download for YouTube
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        // Implement download functionality
+                                        const link = document.createElement("a")
+                                        link.href = song.audioUrl
+                                        link.download = `${song.title} - ${song.artist}.mp3`
+                                        link.click()
+                                        toast.success("Download started")
+                                      }}
+                                    >
+                                      <Download className="h-4 w-4 mr-2" />
+                                      Download
+                                    </DropdownMenuItem>
+                                  )}
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    const messageToShare =
+                                      song.messages.length > 0
+                                        ? `Anonymous message: "${song.messages[0].content}"`
+                                        : "No anonymous messages yet."
+                                    const shareText = `Check out this song on Vibra: "${song.title}" by ${song.artist}. ${messageToShare} Listen here: ${window.location.origin}`
+                                    if (navigator.share) {
+                                      navigator
+                                        .share({
+                                          title: `Vibra: ${song.title}`,
+                                          text: shareText,
+                                          url: window.location.origin,
+                                        })
+                                        .then(() => toast.success("Shared successfully!"))
+                                        .catch((error) => {
+                                          console.error("Error sharing:", error)
+                                          toast.error("Failed to share.")
+                                        })
+                                    } else {
+                                      navigator.clipboard
+                                        .writeText(shareText)
+                                        .then(() => toast.success("Song and message copied to clipboard!"))
+                                        .catch((error) => {
+                                          console.error("Error copying:", error)
+                                          toast.error("Failed to copy to clipboard.")
+                                        })
+                                    }
+                                  }}
+                                >
+                                  <Share2 className="h-4 w-4 mr-2" />
+                                  Share
+                                </DropdownMenuItem>
+                                {user && (
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                      <Plus className="h-4 w-4 mr-2" />
+                                      Add to Playlist
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                      {playlists.length > 0 ? (
+                                        playlists.map((playlist) => (
+                                          <DropdownMenuItem
+                                            key={playlist.id}
+                                            onClick={() => addToPlaylist(song, playlist.id)}
+                                          >
+                                            {playlist.name}
+                                          </DropdownMenuItem>
+                                        ))
+                                      ) : (
+                                        <DropdownMenuItem disabled>No playlists</DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => setShowCreatePlaylist(true)}>
+                                        <PlusCircle className="h-4 w-4 mr-2" />
+                                        Create New
+                                      </DropdownMenuItem>
+                                    </DropdownMenuSubContent>
+                                  </DropdownMenuSub>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="bg-transparent">
+                                  <MessageCircle className="h-4 w-4 mr-1" />
+                                  Read ({song.messages.length})
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle className="flex items-center gap-2">
+                                    <Music className="h-5 w-5" />
+                                    {song.title} - {song.artist}
+                                  </DialogTitle>
+                                  <DialogDescription>Anonymous messages from the community</DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 mt-4">
+                                  {song.messages.length > 0 ? (
+                                    song.messages.map((message) => (
+                                      <div key={message.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                        <p className="text-gray-900 dark:text-gray-100 mb-2">{message.content}</p>
+                                        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                                          <div className="flex items-center gap-2">
+                                            <Badge
+                                              variant="secondary"
+                                              className={`text-xs ${
+                                                moodColors[message.emotion as keyof typeof moodColors] ||
+                                                "bg-gray-100 text-gray-800"
+                                              }`}
+                                            >
+                                              {message.emotion}
+                                            </Badge>
+                                            <span>
+                                              {message.timestamp instanceof Date
+                                                ? message.timestamp.toLocaleDateString()
+                                                : new Date(message.timestamp).toLocaleDateString()}
+                                            </span>
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => likeMessage(message.id)}
+                                            className={`flex items-center gap-1 ${
+                                              firebaseUser && message.likedBy.includes(firebaseUser.uid)
+                                                ? "text-red-500"
+                                                : "hover:text-red-500"
+                                            }`}
+                                          >
+                                            <Heart className="h-4 w-4" />
+                                            <span>{message.likes}</span>
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-center py-8">
+                                      <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                      <p className="text-gray-600 dark:text-gray-300">
+                                        No messages yet. Be the first to share your thoughts!
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                            <Dialog
+                              open={selectedSongForMessage === song.id}
+                              onOpenChange={(open) => {
+                                if (!firebaseUser && open) {
+                                  setShowSignIn(true)
+                                  toast.info("Please sign in to share your message")
+                                  return
+                                }
+                                setSelectedSongForMessage(open ? song.id : null)
+                              }}
+                            >
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                  onClick={(e) => {
+                                    if (!firebaseUser) {
+                                      e.preventDefault()
+                                      setShowSignIn(true)
+                                      toast.info("Please sign in to share your message")
+                                    }
+                                  }}
+                                >
+                                  <MessageCircle className="h-4 w-4 mr-1" />
+                                  Send
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Share Your Anonymous Message</DialogTitle>
+                                  <DialogDescription>
+                                    Express what this song means to you. Your message will be completely anonymous.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 mt-4">
+                                  {messageSuccess ? (
+                                    <div className="text-center py-8">
+                                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <svg
+                                          className="w-8 h-8 text-green-600"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M5 13l4 4L19 7"
+                                          />
+                                        </svg>
+                                      </div>
+                                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                                        Message Sent Successfully!
+                                      </h3>
+                                      <p className="text-gray-600 dark:text-gray-300">
+                                        Your anonymous message has been shared with the community.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <Textarea
+                                        placeholder="What does this song make you feel? Share your story, your unsent message, or what this moment means to you..."
+                                        value={newMessage}
+                                        onChange={(e) => setNewMessage(e.target.value)}
+                                        className="min-h-[120px]"
+                                      />
+                                      <div className="flex justify-end gap-2">
+                                        <Button variant="outline" onClick={() => setSelectedSongForMessage(null)}>
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          onClick={() => addAnonymousMessage(song.id)}
+                                          disabled={!newMessage.trim()}
+                                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                        >
+                                          Send Message
+                                        </Button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      // List View
+                      <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
                         <img
                           src={song.coverUrl || "/placeholder.svg"}
                           alt={`${song.title} cover`}
-                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="w-20 h-20 rounded-lg object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement
                             target.src = "/placeholder.svg?height=300&width=300"
                           }}
                         />
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          {song.externalUrl && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="h-6 w-6 p-0"
-                              onClick={() => openExternalLink(song.externalUrl)}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                          <Button
-                            size="lg"
-                            className="rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 border-2 border-white/50"
-                            onClick={() => togglePlayback(song)}
-                            disabled={!song.audioUrl && song.source !== "youtube"} // Disable if no audio URL and not YouTube
-                          >
-                            {currentlyPlaying === song.id ? (
-                              <Pause className="h-6 w-6 text-white" />
-                            ) : (
-                              <Play className="h-6 w-6 text-white" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="p-4 space-y-3">
-                        <div>
-                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 group-hover:text-purple-600 transition-colors line-clamp-1">
-                            {song.title}
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {song.mood.slice(0, 3).map((mood) => (
-                            <Badge
-                              key={mood}
-                              variant="secondary"
-                              className={`text-xs ${
-                                moodColors[mood as keyof typeof moodColors] || "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {mood}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center gap-1">
-                            <Volume2 className="h-4 w-4" />
-                            <span>{song.plays.toLocaleString()} plays</span>
+                        <div className="flex-1 space-y-2">
+                          <div>
+                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 line-clamp-1">
+                              {song.title}
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <MessageCircle className="h-4 w-4" />
-                            <span>{song.messages.length} messages</span>
+                          <div className="flex flex-wrap gap-1">
+                            {song.mood.slice(0, 3).map((mood) => (
+                              <Badge
+                                key={mood}
+                                variant="secondary"
+                                className={`text-xs ${
+                                  moodColors[mood as keyof typeof moodColors] || "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {mood}
+                              </Badge>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex items-center gap-1">
+                              <Volume2 className="h-4 w-4" />
+                              <span>{song.plays.toLocaleString()} plays</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <MessageCircle className="h-4 w-4" />
+                              <span>{song.messages.length} messages</span>
+                            </div>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          {/* Replace the existing "Add to Playlist" button with this dropdown menu */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-48">
-                              <DropdownMenuItem
-                                onClick={() => togglePlayback(song)}
-                                disabled={!song.audioUrl && song.source !== "youtube"}
-                              >
-                                <Play className="h-4 w-4 mr-2" />
-                                Play Now
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  // Implement play next functionality
-                                  toast.info("Added to queue (play next)")
-                                }}
-                              >
-                                <SkipForward className="h-4 w-4 mr-2" />
-                                Play Next
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  // Implement add to queue functionality
-                                  toast.info("Added to queue")
-                                }}
-                              >
-                                <ListMusic className="h-4 w-4 mr-2" />
-                                Add to Queue
-                              </DropdownMenuItem>
-                              {song.audioUrl &&
-                                song.source !== "youtube" && ( // Disable download for YouTube
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      // Implement download functionality
-                                      const link = document.createElement("a")
-                                      link.href = song.audioUrl
-                                      link.download = `${song.title} - ${song.artist}.mp3`
-                                      link.click()
-                                      toast.success("Download started")
-                                    }}
-                                  >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </DropdownMenuItem>
-                                )}
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  const messageToShare =
-                                    song.messages.length > 0
-                                      ? `Anonymous message: "${song.messages[0].content}"`
-                                      : "No anonymous messages yet."
-                                  const shareText = `Check out this song on Vibra: "${song.title}" by ${song.artist}. ${messageToShare} Listen here: ${window.location.origin}`
-                                  if (navigator.share) {
-                                    navigator
-                                      .share({
-                                        title: `Vibra: ${song.title}`,
-                                        text: shareText,
-                                        url: window.location.origin,
-                                      })
-                                      .then(() => toast.success("Shared successfully!"))
-                                      .catch((error) => {
-                                        console.error("Error sharing:", error)
-                                        toast.error("Failed to share.")
-                                      })
-                                  } else {
-                                    navigator.clipboard
-                                      .writeText(shareText)
-                                      .then(() => toast.success("Song and message copied to clipboard!"))
-                                      .catch((error) => {
-                                        console.error("Error copying:", error)
-                                        toast.error("Failed to copy to clipboard.")
-                                      })
-                                  }
-                                }}
-                              >
-                                <Share2 className="h-4 w-4 mr-2" />
-                                Share
-                              </DropdownMenuItem>
-                              {user && (
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add to Playlist
-                                  </DropdownMenuSubTrigger>
-                                  <DropdownMenuSubContent>
-                                    {playlists.length > 0 ? (
-                                      playlists.map((playlist) => (
-                                        <DropdownMenuItem
-                                          key={playlist.id}
-                                          onClick={() => addToPlaylist(song, playlist.id)}
-                                        >
-                                          {playlist.name}
-                                        </DropdownMenuItem>
-                                      ))
-                                    ) : (
-                                      <DropdownMenuItem disabled>No playlists</DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => setShowCreatePlaylist(true)}>
-                                      <PlusCircle className="h-4 w-4 mr-2" />
-                                      Create New
-                                    </DropdownMenuItem>
-                                  </DropdownMenuSubContent>
-                                </DropdownMenuSub>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="bg-transparent">
-                                <MessageCircle className="h-4 w-4 mr-1" />
-                                Read ({song.messages.length})
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                              <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                  <Music className="h-5 w-5" />
-                                  {song.title} - {song.artist}
-                                </DialogTitle>
-                                <DialogDescription>Anonymous messages from the community</DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4 mt-4">
-                                {song.messages.length > 0 ? (
-                                  song.messages.map((message) => (
-                                    <div key={message.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                      <p className="text-gray-900 dark:text-gray-100 mb-2">{message.content}</p>
-                                      <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                                        <div className="flex items-center gap-2">
-                                          <Badge
-                                            variant="secondary"
-                                            className={`text-xs ${
-                                              moodColors[message.emotion as keyof typeof moodColors] ||
-                                              "bg-gray-100 text-gray-800"
-                                            }`}
-                                          >
-                                            {message.emotion}
-                                          </Badge>
-                                          <span>
-                                            {message.timestamp instanceof Date
-                                              ? message.timestamp.toLocaleDateString()
-                                              : new Date(message.timestamp).toLocaleDateString()}
-                                          </span>
-                                        </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => likeMessage(message.id)}
-                                          className={`flex items-center gap-1 ${
-                                            firebaseUser && message.likedBy.includes(firebaseUser.uid)
-                                              ? "text-red-500"
-                                              : "hover:text-red-500"
-                                          }`}
-                                        >
-                                          <Heart className="h-4 w-4" />
-                                          <span>{message.likes}</span>
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="text-center py-8">
-                                    <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                    <p className="text-gray-600 dark:text-gray-300">
-                                      No messages yet. Be the first to share your thoughts!
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-
-                          <Dialog
-                            open={selectedSongForMessage === song.id}
-                            onOpenChange={(open) => {
-                              if (!firebaseUser && open) {
-                                setShowSignIn(true)
-                                toast.info("Please sign in to share your message")
-                                return
-                              }
-                              setSelectedSongForMessage(open ? song.id : null)
-                            }}
-                          >
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                                onClick={(e) => {
-                                  if (!firebaseUser) {
-                                    e.preventDefault()
-                                    setShowSignIn(true)
-                                    toast.info("Please sign in to share your message")
-                                  }
-                                }}
-                              >
-                                <MessageCircle className="h-4 w-4 mr-1" />
-                                Send
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Share Your Anonymous Message</DialogTitle>
-                                <DialogDescription>
-                                  Express what this song means to you. Your message will be completely anonymous.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4 mt-4">
-                                {messageSuccess ? (
-                                  <div className="text-center py-8">
-                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                      <svg
-                                        className="w-8 h-8 text-green-600"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M5 13l4 4L19 7"
-                                        />
-                                      </svg>
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                                      Message Sent Successfully!
-                                    </h3>
-                                    <p className="text-gray-600 dark:text-gray-300">
-                                      Your anonymous message has been shared with the community.
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <Textarea
-                                      placeholder="What does this song make you feel? Share your story, your unsent message, or what this moment means to you..."
-                                      value={newMessage}
-                                      onChange={(e) => setNewMessage(e.target.value)}
-                                      className="min-h-[120px]"
-                                    />
-                                    <div className="flex justify-end gap-2">
-                                      <Button variant="outline" onClick={() => setSelectedSongForMessage(null)}>
-                                        Cancel
-                                      </Button>
-                                      <Button
-                                        onClick={() => addAnonymousMessage(song.id)}
-                                        disabled={!newMessage.trim()}
-                                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                                      >
-                                        Send Message
-                                      </Button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // List View
-                    <div className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-                      <img
-                        src={song.coverUrl || "/placeholder.svg"}
-                        alt={`${song.title} cover`}
-                        className="w-20 h-20 rounded-lg object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?height=300&width=300"
-                        }}
-                      />
-                      <div className="flex-1 space-y-2">
-                        <div>
-                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 line-clamp-1">
-                            {song.title}
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {song.mood.slice(0, 3).map((mood) => (
-                            <Badge
-                              key={mood}
-                              variant="secondary"
-                              className={`text-xs ${
-                                moodColors[mood as keyof typeof moodColors] || "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {mood}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center gap-1">
-                            <Volume2 className="h-4 w-4" />
-                            <span>{song.plays.toLocaleString()} plays</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MessageCircle className="h-4 w-4" />
-                            <span>{song.messages.length} messages</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-8 w-8 p-0"
-                          onClick={() => togglePlayback(song)}
-                          disabled={!song.audioUrl && song.source !== "youtube"}
-                        >
-                          {currentlyPlaying === song.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </Button>
-                        {song.externalUrl && (
                           <Button
                             size="sm"
                             variant="secondary"
                             className="h-8 w-8 p-0"
-                            onClick={() => openExternalLink(song.externalUrl)}
+                            onClick={() => togglePlayback(song)}
+                            disabled={!song.audioUrl && song.source !== "youtube"}
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            {currentlyPlaying === song.id ? (
+                              <Pause className="h-4 w-4" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
                           </Button>
-                        )}
+                          {song.externalUrl && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 w-8 p-0"
+                              onClick={() => openExternalLink(song.externalUrl)}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-        {/* No Songs Found */}
-        {!isLoading && filteredSongs.length === 0 && (
-          <div className="text-center py-12">
-            <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No songs found</h3>
-            <p className="text-gray-600 dark:text-gray-300">Try Again </p>
-          </div>
-        )}
-      </div>
+          {/* No Songs Found */}
+          {!isLoading && filteredSongs.length === 0 && (
+            <div className="text-center py-12">
+              <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No songs found</h3>
+              <p className="text-gray-600 dark:text-gray-300">Try Again </p>
+            </div>
+          )}
+        </div>
+      </main>
 
       {/* Create Playlist Dialog */}
       <Dialog open={showCreatePlaylist} onOpenChange={setShowCreatePlaylist}>
