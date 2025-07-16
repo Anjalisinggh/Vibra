@@ -395,39 +395,55 @@ const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
   }
 }
 
-// Remove the hardcoded API key and the fetch call to YouTube Data API.
-// This function will now generate a "song" object that, when played, will open a YouTube search embed.
-// Replace the entire `fetchYouTubeMusic` function with the following:
+// Function to fetch YouTube music using the YouTube Data API
 const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
   if (!query.trim()) return []
 
-  const title = query // Use query as title for simplicity
-  const artist = "Various Artists" // Placeholder artist for search results
-  const moods = assignMoodToSong(title, artist)
-  const emotion = getPrimaryEmotion(moods)
+  const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
+  if (!YOUTUBE_API_KEY) {
+    console.warn("NEXT_PUBLIC_YOUTUBE_API_KEY is not set. YouTube search will not function.")
+    return []
+  }
 
-  // Construct the YouTube search embed URL
-  const youtubeSearchEmbedUrl = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&key=${YOUTUBE_API_KEY}&maxResults=10`,
+    )
+    const data = await res.json()
 
-  // Return a single "song" representing the YouTube search result
-  return [
-    {
-      id: `youtube_search_${btoa(query).replace(/=/g, "")}`, // Base64 encode query for unique ID
-      title: `YouTube Search: ${title}`,
-      artist: artist,
-      primaryArtists: artist,
-      mood: moods,
-      emotion: emotion,
-      coverUrl: "/placeholder.svg?height=300&width=300", // Placeholder cover
-      audioUrl: "", // No direct audio URL
-      previewUrl: "",
-      externalUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, // Link to actual YouTube search
-      messages: [],
-      plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder plays
-      duration: 240, // Placeholder duration
-      source: "youtube",
-    },
-  ]
+    if (data.items && data.items.length > 0) {
+      return data.items
+        .filter((item: any) => item.id.videoId) // Ensure it's a video
+        .map((item: any) => {
+          const title = item.snippet.title
+          const artist = item.snippet.channelTitle || "Unknown Artist"
+          const moods = assignMoodToSong(title, artist)
+          const emotion = getPrimaryEmotion(moods)
+          const videoId = item.id.videoId
+
+          return {
+            id: `youtube_${videoId}`,
+            title: title,
+            artist: artist,
+            primaryArtists: artist,
+            mood: moods,
+            emotion: emotion,
+            coverUrl: item.snippet.thumbnails.high?.url || "/placeholder.svg?height=300&width=300",
+            audioUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`, // Direct embed URL
+            previewUrl: "", // Not directly available from search API
+            externalUrl: `https://www.youtube.com/watch?v=${videoId}`,
+            messages: [],
+            plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder, actual plays require another API call
+            duration: 240, // Placeholder, actual duration requires another API call
+            source: "youtube",
+          }
+        })
+    }
+    return []
+  } catch (error) {
+    console.error("Error fetching YouTube music:", error)
+    return []
+  }
 }
 
 // Function to fetch a song by ID
@@ -472,34 +488,47 @@ const fetchSongById = async (
     } catch (error) {
       console.error("Error fetching Saavn song by ID:", error)
     }
-  } else if (id.startsWith("youtube_search_")) {
+  } else if (id.startsWith("youtube_")) {
     try {
-      const encodedQuery = id.replace("youtube_search_", "")
-      const query = atob(encodedQuery) // Decode the query
+      const videoId = id.replace("youtube_", "")
+      const YOUTUBE_API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY
 
-      const title = query
-      const artist = "Various Artists"
-      const moods = assignMoodToSong(title, artist)
-      const emotion = getPrimaryEmotion(moods)
+      if (!YOUTUBE_API_KEY) {
+        console.warn("NEXT_PUBLIC_YOUTUBE_API_KEY is not set. Cannot fetch YouTube song by ID.")
+        return null
+      }
 
-      return {
-        id: id,
-        title: `YouTube Search: ${title}`,
-        artist: artist,
-        primaryArtists: artist,
-        mood: moods,
-        emotion: emotion,
-        coverUrl: "/placeholder.svg?height=300&width=300",
-        audioUrl: "",
-        previewUrl: "",
-        externalUrl: `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`,
-        messages: [],
-        plays: Math.floor(Math.random() * 1000000) + 10000,
-        duration: 240,
-        source: "youtube",
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YOUTUBE_API_KEY}`,
+      )
+      const data = await res.json()
+
+      if (data.items && data.items.length > 0) {
+        const item = data.items[0]
+        const title = item.snippet.title
+        const artist = item.snippet.channelTitle || "Unknown Artist"
+        const moods = assignMoodToSong(title, artist)
+        const emotion = getPrimaryEmotion(moods)
+
+        return {
+          id: id,
+          title: title,
+          artist: artist,
+          primaryArtists: artist,
+          mood: moods,
+          emotion: emotion,
+          coverUrl: item.snippet.thumbnails.high?.url || "/placeholder.svg?height=300&width=300",
+          audioUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`, // Direct embed URL
+          previewUrl: "",
+          externalUrl: `https://www.youtube.com/watch?v=${videoId}`,
+          messages: [],
+          plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder
+          duration: 240, // Placeholder
+          source: "youtube",
+        }
       }
     } catch (error) {
-      console.error("Error reconstructing YouTube search song by ID:", error)
+      console.error("Error fetching YouTube song by ID:", error)
     }
   }
   return null
@@ -968,6 +997,9 @@ export default function VibraApp() {
       setCurrentlyPlaying(null)
       setPlaylists([])
       setCurrentPlaylist(null)
+      setYouTubePlayerOpen(false) // Close YouTube player on sign out
+      setCurrentYouTubeVideoId(null)
+      setCurrentYouTubeSongTitle(null)
     } catch (error) {
       console.error("Error signing out:", error)
     }
@@ -1087,7 +1119,6 @@ export default function VibraApp() {
       toast.info("Please sign in to share your message")
       return
     }
-
     if (!newMessage.trim()) return
 
     try {
@@ -1158,11 +1189,14 @@ export default function VibraApp() {
     setCurrentPlaylist(playlist)
     setCurrentSongIndex(0)
     const firstSong = playlist.songs[0]
-    playSpecificSong(firstSong)
+    // Use togglePlayback to handle both audio and YouTube songs
+    togglePlayback(firstSong)
     setShowPlaylists(false) // Close the playlist dialog after playing
   }
 
   const playSpecificSong = (song: Song) => {
+    // This helper is now primarily used by handleSongEnd for repeatMode === "one"
+    // It assumes an audio song. For general playback, use togglePlayback.
     if (currentAudio) {
       currentAudio.pause()
       setCurrentAudio(null)
@@ -1172,10 +1206,9 @@ export default function VibraApp() {
       progressInterval.current = null
     }
 
-    if (song.audioUrl) {
+    if (song.audioUrl && song.source === "saavn") {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
-
       // Set initial progress
       setCurrentTime(0)
       setPlaybackProgress(0)
@@ -1207,6 +1240,7 @@ export default function VibraApp() {
         .catch((error) => {
           console.error("Error playing audio:", error)
           toast.error("Failed to play audio")
+          setCurrentlyPlaying(null)
         })
 
       audio.onended = () => {
@@ -1219,18 +1253,25 @@ export default function VibraApp() {
       }
     } else {
       toast.error("No audio URL available for this song")
+      setCurrentlyPlaying(null)
     }
   }
 
   const handleSongEnd = () => {
-    if (repeatMode === "one" && currentlyPlaying) {
-      // Replay the same song
-      const song = currentPlaylist
-        ? currentPlaylist.songs[currentSongIndex]
-        : songs.find((s) => s.id === currentlyPlaying)
-      if (song) playSpecificSong(song)
+    // This function is only called by HTMLAudioElement.onended, so it only applies to Saavn songs.
+    const activeSong = songs.find((s) => s.id === currentlyPlaying) || currentPlaylist?.songs[currentSongIndex]
+
+    if (!activeSong || activeSong.source !== "saavn" || !activeSong.audioUrl) {
+      // Ensure it's an audio song that actually ended
+      setCurrentlyPlaying(null)
+      setCurrentAudio(null)
+      return
+    }
+
+    if (repeatMode === "one") {
+      playSpecificSong(activeSong) // Replay the same song
     } else if (currentPlaylist && currentPlaylist.songs.length > 0) {
-      // Playlist playback logic
+      // Playlist playback logic for audio songs
       let nextIndex = currentSongIndex + 1
       if (nextIndex >= currentPlaylist.songs.length) {
         if (repeatMode === "all") {
@@ -1243,9 +1284,11 @@ export default function VibraApp() {
       }
       setCurrentSongIndex(nextIndex)
       const nextSong = currentPlaylist.songs[nextIndex]
-      playSpecificSong(nextSong)
+      // If the next song in playlist is YouTube, it will open the dialog.
+      // If it's audio, it will play.
+      togglePlayback(nextSong)
     } else {
-      // Single song playback ended
+      // Single audio song playback ended
       setCurrentlyPlaying(null)
       setCurrentAudio(null)
     }
@@ -1253,9 +1296,12 @@ export default function VibraApp() {
 
   const playNext = () => {
     const currentQueue = currentPlaylist ? currentPlaylist.songs : filteredSongs
-    const currentIndex = currentPlaylist ? currentSongIndex : currentQueue.findIndex((s) => s.id === currentlyPlaying)
+    const currentIndex = currentQueue.findIndex((s) => s.id === currentlyPlaying)
 
-    if (!currentlyPlaying || currentQueue.length === 0) return
+    if (currentIndex === -1 || currentQueue.length === 0) {
+      // If no song is currently playing or queue is empty, do nothing
+      return
+    }
 
     let nextIndex = currentIndex + 1
     if (nextIndex >= currentQueue.length) {
@@ -1268,24 +1314,29 @@ export default function VibraApp() {
           currentAudio.pause()
           setCurrentAudio(null)
         }
+        setYouTubePlayerOpen(false) // Close YouTube player if it was open
         return
       }
     }
+
+    const nextSong = currentQueue[nextIndex]
     if (currentPlaylist) {
-      // Only update currentSongIndex if it's a playlist
-      setCurrentSongIndex(nextIndex)
+      setCurrentSongIndex(nextIndex) // Update index for playlist
     }
-    playSpecificSong(currentQueue[nextIndex])
+    togglePlayback(nextSong)
   }
 
   const playPrevious = () => {
     const currentQueue = currentPlaylist ? currentPlaylist.songs : filteredSongs
-    const currentIndex = currentPlaylist ? currentSongIndex : currentQueue.findIndex((s) => s.id === currentlyPlaying)
+    const currentIndex = currentQueue.findIndex((s) => s.id === currentlyPlaying)
 
-    if (!currentlyPlaying || currentQueue.length === 0) return
+    if (currentIndex === -1 || currentQueue.length === 0) {
+      return
+    }
 
-    // If more than 3 seconds into the song, restart it
-    if (currentAudio && currentAudio.currentTime > 3) {
+    // If more than 3 seconds into the song, restart it (only for audio)
+    const activeSong = currentQueue[currentIndex]
+    if (activeSong.source === "saavn" && currentAudio && currentAudio.currentTime > 3) {
       currentAudio.currentTime = 0
       return
     }
@@ -1295,16 +1346,22 @@ export default function VibraApp() {
       if (repeatMode === "all") {
         prevIndex = currentQueue.length - 1
       } else {
-        // At the beginning, just restart current song
-        playSpecificSong(currentQueue[currentIndex])
+        // At the beginning, just restart current song (if audio) or do nothing (if YouTube)
+        if (activeSong.source === "saavn" && activeSong.audioUrl) {
+          togglePlayback(activeSong) // Restart current audio song
+        } else {
+          // For YouTube or no audio, just stay on current or do nothing
+          toast.info("Already at the beginning of the queue.")
+        }
         return
       }
     }
+
+    const prevSong = currentQueue[prevIndex]
     if (currentPlaylist) {
-      // Only update currentSongIndex if it's a playlist
-      setCurrentSongIndex(prevIndex)
+      setCurrentSongIndex(prevIndex) // Update index for playlist
     }
-    playSpecificSong(currentQueue[prevIndex])
+    togglePlayback(prevSong)
   }
 
   const toggleRepeat = () => {
@@ -1315,93 +1372,106 @@ export default function VibraApp() {
     toast.success(`Repeat mode: ${modes[nextIndex]}`)
   }
 
-  // Modify the `togglePlayback` function to handle YouTube embeds:
+  // Unified togglePlayback function to handle both Saavn audio and YouTube embeds
   const togglePlayback = (song: Song) => {
-    // Pause any currently playing audio
+    // Always clear existing audio playback
     if (currentAudio) {
       currentAudio.pause()
       setCurrentAudio(null)
     }
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current)
+      progressInterval.current = null
+    }
+    // Always close YouTube player if a new song is selected or the same YouTube song is clicked to stop
+    if (youTubePlayerOpen) {
+      setYouTubePlayerOpen(false)
+      setCurrentYouTubeVideoId(null)
+      setCurrentYouTubeSongTitle(null)
+    }
 
-    // Close any open YouTube player
-    setYouTubePlayerOpen(false)
-    setCurrentYouTubeVideoId(null)
-    setCurrentYouTubeSongTitle(null)
-
+    // If the same song is clicked, and it was playing, stop it.
     if (currentlyPlaying === song.id) {
-      // If the same song is clicked, pause it
       setCurrentlyPlaying(null)
-      toast.info(`Paused: ${song.title}`)
-    } else {
-      // Play new song
-      if (song.audioUrl) {
-        const audio = new Audio(song.audioUrl)
-        audio.crossOrigin = "anonymous"
+      toast.info(`Stopped: ${song.title}`)
+      return // Stop playback
+    }
 
-        // Set initial progress
-        setCurrentTime(0)
-        setPlaybackProgress(0)
+    // Set the new song as currently playing
+    setCurrentlyPlaying(song.id)
 
-        // Update progress while playing
-        const updateProgress = () => {
-          if (audio.duration) {
-            const progress = (audio.currentTime / audio.duration) * 100
-            setPlaybackProgress(progress)
-            setCurrentTime(audio.currentTime)
-          }
+    if (song.source === "saavn" && song.audioUrl) {
+      const audio = new Audio(song.audioUrl)
+      audio.crossOrigin = "anonymous"
+      setCurrentTime(0)
+      setPlaybackProgress(0)
+
+      const updateProgress = () => {
+        if (audio.duration) {
+          const progress = (audio.currentTime / audio.duration) * 100
+          setPlaybackProgress(progress)
+          setCurrentTime(audio.currentTime)
         }
-        progressInterval.current = setInterval(updateProgress, 1000)
-        audio.addEventListener("timeupdate", updateProgress)
+      }
+      progressInterval.current = setInterval(updateProgress, 1000)
+      audio.addEventListener("timeupdate", updateProgress)
 
-        audio
-          .play()
-          .then(() => {
-            setCurrentAudio(audio)
-            setCurrentlyPlaying(song.id)
-            // If playing from playlist, find the current index
-            if (currentPlaylist) {
-              const index = currentPlaylist.songs.findIndex((s) => s.id === song.id)
-              if (index >= 0) {
-                setCurrentSongIndex(index)
-              }
+      audio
+        .play()
+        .then(() => {
+          setCurrentAudio(audio)
+          toast.info(`Playing: ${song.title}`)
+          if (currentPlaylist) {
+            const index = currentPlaylist.songs.findIndex((s) => s.id === song.id)
+            if (index >= 0) {
+              setCurrentSongIndex(index)
             }
-          })
-          .catch((error) => {
-            console.error("Error playing audio:", error)
-            toast.error("Failed to play audio")
-          })
-
-        audio.onended = () => {
-          if (progressInterval.current) {
-            clearInterval(progressInterval.current)
-            progressInterval.current = null
           }
-          audio.removeEventListener("timeupdate", updateProgress)
-          handleSongEnd()
-        }
-      } else if (song.source === "youtube") {
-        // For YouTube search embeds, the "video ID" is actually the search query embedded in the song title
-        const searchQueryForEmbed = song.title.replace("YouTube Search: ", "")
-        setCurrentYouTubeVideoId(searchQueryForEmbed)
-        setCurrentYouTubeSongTitle(song.title)
-        setYouTubePlayerOpen(true)
-        setCurrentlyPlaying(song.id) // Mark as currently playing
-        toast.info(`Playing YouTube Search: ${song.title}`)
-        // For YouTube, progress is not tracked via HTMLAudioElement, so reset/hide progress bar
-        setCurrentTime(0)
-        setPlaybackProgress(0)
+        })
+        .catch((error) => {
+          console.error("Error playing audio:", error)
+          toast.error("Failed to play audio")
+          setCurrentlyPlaying(null) // Clear playing state on error
+        })
+
+      audio.onended = () => {
         if (progressInterval.current) {
           clearInterval(progressInterval.current)
           progressInterval.current = null
         }
+        audio.removeEventListener("timeupdate", updateProgress)
+        handleSongEnd()
+      }
+    } else if (song.source === "youtube" && song.audioUrl) {
+      // For YouTube videos, open the dialog using the direct embed URL
+      const videoIdMatch = song.audioUrl.match(/\/embed\/([^?]+)/)
+      const videoId = videoIdMatch ? videoIdMatch[1] : null
+
+      if (videoId) {
+        setCurrentYouTubeVideoId(videoId)
+        setCurrentYouTubeSongTitle(song.title)
+        setYouTubePlayerOpen(true)
+        toast.info(`Playing YouTube: ${song.title}`)
       } else {
-        toast.error("No playable source available for this song.")
+        toast.error("Invalid YouTube video URL.")
+        setCurrentlyPlaying(null)
       }
 
-      // Clear playlist context if playing individual song
-      if (!currentPlaylist || !currentPlaylist.songs.some((s) => s.id === song.id)) {
-        setCurrentPlaylist(null)
+      setCurrentTime(0)
+      setPlaybackProgress(0)
+      if (currentPlaylist) {
+        const index = currentPlaylist.songs.findIndex((s) => s.id === song.id)
+        if (index >= 0) {
+          setCurrentSongIndex(index)
+        }
       }
+    } else {
+      toast.error("No playable source available for this song.")
+      setCurrentlyPlaying(null) // Clear playing state if no source
+    }
+
+    if (currentPlaylist && !currentPlaylist.songs.some((s) => s.id === song.id)) {
+      setCurrentPlaylist(null)
     }
   }
 
@@ -1559,7 +1629,7 @@ export default function VibraApp() {
                                           setCurrentPlaylist(playlist)
                                         }
                                         setCurrentSongIndex(index)
-                                        playSpecificSong(song)
+                                        togglePlayback(song) // Changed from playSpecificSong
                                         setShowPlaylists(false) // Close dialog when a song from playlist is played
                                       }}
                                     >
@@ -1809,7 +1879,6 @@ export default function VibraApp() {
                   </Dialog>
                 </div>
               )}
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -1826,7 +1895,6 @@ export default function VibraApp() {
             </div>
           </div>
         </div>
-
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="sm:hidden bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-4 space-y-4">
@@ -1940,119 +2008,157 @@ export default function VibraApp() {
       </header>
 
       {/* Now Playing Bar */}
-      {(currentlyPlaying || (currentPlaylist && currentPlaylist.songs.length > 0)) && (
+      {currentlyPlaying && ( // Only show if something is marked as playing
         <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
           <div className="container mx-auto">
             <div className="flex items-center justify-between gap-4">
               {/* Song Info */}
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <img
-                  src={
-                    currentPlaylist
-                      ? currentPlaylist.songs[currentSongIndex]?.coverUrl
-                      : songs.find((s) => s.id === currentlyPlaying)?.coverUrl || "/placeholder.svg"
-                  }
-                  alt="Now playing"
-                  className="w-12 h-12 rounded object-cover"
-                />
-                <div className="min-w-0">
-                  <h4 className="font-semibold text-sm truncate">
-                    {currentPlaylist
-                      ? currentPlaylist.songs[currentSongIndex]?.title
-                      : songs.find((s) => s.id === currentlyPlaying)?.title}
-                  </h4>
-                  <p className="text-xs text-gray-600 dark:text-gray-300 truncate">
-                    {currentPlaylist
-                      ? currentPlaylist.songs[currentSongIndex]?.artist
-                      : songs.find((s) => s.id === currentlyPlaying)?.artist}
-                  </p>
-                </div>
-              </div>
+              {(() => {
+                const activeSong = currentPlaylist
+                  ? currentPlaylist.songs[currentSongIndex]
+                  : songs.find((s) => s.id === currentlyPlaying)
+
+                if (!activeSong) return null // Should not happen if currentlyPlaying is set correctly
+
+                return (
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <img
+                      src={activeSong.coverUrl || "/placeholder.svg"}
+                      alt={`${activeSong.title} cover`}
+                      className="w-12 h-12 rounded object-cover"
+                    />
+                    <div className="min-w-0">
+                      <h4 className="font-semibold text-sm truncate">{activeSong.title}</h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-300 truncate">{activeSong.artist}</p>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Player Controls */}
-              <div className="flex-1 max-w-md">
-                <div className="flex items-center justify-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={playPrevious} disabled={!currentlyPlaying}>
-                    <SkipBack className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (currentPlaylist) {
-                        togglePlayback(currentPlaylist.songs[currentSongIndex])
-                      } else {
-                        const song = songs.find((s) => s.id === currentlyPlaying)
-                        if (song) togglePlayback(song)
-                      }
-                    }}
-                  >
-                    {currentlyPlaying && currentAudio && !currentAudio.paused ? (
-                      <Pause className="h-4 w-4" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={playNext} disabled={!currentlyPlaying}>
-                    <SkipForward className="h-4 w-4" />
-                  </Button>
-                </div>
-                {/* Progress Bar */}
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
-                    {formatDuration(currentTime)}
-                  </span>
-                  <div className="flex-1 relative group">
-                    <Progress
-                      value={playbackProgress}
-                      className="h-2 cursor-pointer"
-                      onClick={(e) => {
-                        if (currentAudio) {
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          const percent = (e.clientX - rect.left) / rect.width
-                          const newTime = percent * currentAudio.duration
-                          currentAudio.currentTime = newTime
-                          setCurrentTime(newTime)
-                          setPlaybackProgress(percent * 100)
-                        }
-                      }}
-                    />
-                    <div
-                      className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
-                      style={{ width: `${playbackProgress}%` }}
-                    />
+              {(() => {
+                const activeSong = currentPlaylist
+                  ? currentPlaylist.songs[currentSongIndex]
+                  : songs.find((s) => s.id === currentlyPlaying)
+
+                if (!activeSong) return null
+
+                const isYouTube = activeSong.source === "youtube"
+                const isAudioPlaying = currentAudio && !currentAudio.paused
+
+                return (
+                  <div className="flex-1 max-w-md">
+                    <div className="flex items-center justify-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={playPrevious} disabled={isYouTube}>
+                        <SkipBack className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (isYouTube) {
+                            setYouTubePlayerOpen(!youTubePlayerOpen) // Toggle YouTube dialog
+                          } else {
+                            if (currentAudio) {
+                              if (isAudioPlaying) {
+                                currentAudio.pause()
+                              } else {
+                                currentAudio.play()
+                              }
+                            }
+                          }
+                        }}
+                      >
+                        {isYouTube ? (
+                          youTubePlayerOpen ? (
+                            <Pause className="h-4 w-4" />
+                          ) : (
+                            <Play className="h-4 w-4" />
+                          )
+                        ) : isAudioPlaying ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={playNext} disabled={isYouTube}>
+                        <SkipForward className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="flex items-center gap-2 mt-1">
+                      {isYouTube ? (
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-full text-center">
+                          YouTube content
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">
+                            {formatDuration(currentTime)}
+                          </span>
+                          <div className="flex-1 relative group">
+                            <Progress
+                              value={playbackProgress}
+                              className="h-2 cursor-pointer"
+                              onClick={(e) => {
+                                if (currentAudio) {
+                                  const rect = e.currentTarget.getBoundingClientRect()
+                                  const percent = (e.clientX - rect.left) / rect.width
+                                  const newTime = percent * currentAudio.duration
+                                  currentAudio.currentTime = newTime
+                                  setCurrentTime(newTime)
+                                  setPlaybackProgress(percent * 100)
+                                }
+                              }}
+                            />
+                            <div
+                              className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
+                              style={{ width: `${playbackProgress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
+                            {formatDuration(activeSong.duration || 0)}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 w-10">
-                    {formatDuration(
-                      currentPlaylist
-                        ? currentPlaylist.songs[currentSongIndex]?.duration || 0
-                        : songs.find((s) => s.id === currentlyPlaying)?.duration || 0,
-                    )}
-                  </span>
-                </div>
-              </div>
+                )
+              })()}
 
               {/* Additional Controls */}
-              <div className="flex items-center gap-2 flex-1 justify-end">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={toggleRepeat}
-                  className={repeatMode !== "none" ? "text-purple-600" : ""}
-                >
-                  <Repeat className="h-4 w-4" />
-                  {repeatMode === "one" && (
-                    <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                      1
-                    </span>
-                  )}
-                </Button>
-                {currentPlaylist && (
-                  <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
-                    {currentSongIndex + 1} / {currentPlaylist.songs.length}
-                  </span>
-                )}
-              </div>
+              {(() => {
+                const activeSong = currentPlaylist
+                  ? currentPlaylist.songs[currentSongIndex]
+                  : songs.find((s) => s.id === currentlyPlaying)
+
+                if (!activeSong) return null
+                const isYouTube = activeSong.source === "youtube"
+
+                return (
+                  <div className="flex items-center gap-2 flex-1 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleRepeat}
+                      className={repeatMode !== "none" ? "text-purple-600" : ""}
+                      disabled={isYouTube} // Disable repeat for YouTube
+                    >
+                      <Repeat className="h-4 w-4" />
+                      {repeatMode === "one" && (
+                        <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                          1
+                        </span>
+                      )}
+                    </Button>
+                    {currentPlaylist && (
+                      <span className="text-xs text-gray-600 dark:text-gray-300 hidden sm:inline">
+                        {currentSongIndex + 1} / {currentPlaylist.songs.length}
+                      </span>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>
@@ -2255,21 +2361,22 @@ export default function VibraApp() {
                                 <ListMusic className="h-4 w-4 mr-2" />
                                 Add to Queue
                               </DropdownMenuItem>
-                              {song.audioUrl && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    // Implement download functionality
-                                    const link = document.createElement("a")
-                                    link.href = song.audioUrl
-                                    link.download = `${song.title} - ${song.artist}.mp3`
-                                    link.click()
-                                    toast.success("Download started")
-                                  }}
-                                >
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Download
-                                </DropdownMenuItem>
-                              )}
+                              {song.audioUrl &&
+                                song.source !== "youtube" && ( // Disable download for YouTube
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      // Implement download functionality
+                                      const link = document.createElement("a")
+                                      link.href = song.audioUrl
+                                      link.download = `${song.title} - ${song.artist}.mp3`
+                                      link.click()
+                                      toast.success("Download started")
+                                    }}
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                  </DropdownMenuItem>
+                                )}
                               <DropdownMenuItem
                                 onClick={() => {
                                   const messageToShare =
@@ -2562,7 +2669,7 @@ export default function VibraApp() {
           <div className="text-center py-12">
             <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No songs found</h3>
-            <p className="text-gray-600 dark:text-gray-300">Try adjusting your search or mood filter.</p>
+            <p className="text-gray-600 dark:text-gray-300">Try Again </p>
           </div>
         )}
       </div>
@@ -2614,7 +2721,7 @@ export default function VibraApp() {
             <iframe
               width="100%"
               height="100%"
-              src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentYouTubeVideoId)}&autoplay=1&rel=0`}
+              src={`https://www.youtube.com/embed/${currentYouTubeVideoId}?autoplay=1&rel=0`}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
