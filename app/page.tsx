@@ -1,5 +1,6 @@
 "use client"
 import { FaInstagram, FaTwitter, FaGithub } from "react-icons/fa"
+import { DialogTrigger } from "@/components/ui/dialog"
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -18,14 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Music,
   Heart,
@@ -179,7 +173,496 @@ interface AppUser {
   email: string
 }
 
+interface SaavnAlbum {
+  id: string
+  name: string
+  image: Array<{ quality: string; url: string }>
+  url: string
+  songCount: number
+}
+
+// Function to fetch albums from Saavn API
+const fetchSaavnAlbums = async (query: string): Promise<SaavnAlbum[]> => {
+  try {
+    const res = await fetch(`https://saavn.dev/api/search/albums?query=${encodeURIComponent(query)}`)
+    const data = await res.json()
+    if (data.success && data.data && data.data.results) {
+      return data.data.results.map((album: any) => ({
+        id: album.id,
+        name: album.name,
+        image: album.image,
+        url: album.url,
+        songCount: album.songCount,
+      }))
+    }
+    return []
+  } catch (error) {
+    console.error("Error fetching Saavn albums:", error)
+    return []
+  }
+}
+
+// Function to assign mood based on song title and artist
+const assignMoodToSong = (title: string, artist: string): string[] => {
+  const lowerTitle = title.toLowerCase()
+  const lowerArtist = artist.toLowerCase()
+  const text = `${lowerTitle} ${lowerArtist}`
+  const moods: string[] = []
+
+  if (text.includes("love") || text.includes("heart") || text.includes("romantic") || text.includes("kiss")) {
+    moods.push("love", "romantic")
+  }
+  if (
+    text.includes("sad") ||
+    text.includes("cry") ||
+    text.includes("tear") ||
+    text.includes("broken") ||
+    text.includes("hurt") ||
+    text.includes("pain")
+  ) {
+    moods.push("melancholy")
+  }
+  if (
+    text.includes("happy") ||
+    text.includes("joy") ||
+    text.includes("celebration") ||
+    text.includes("party") ||
+    text.includes("smile")
+  ) {
+    moods.push("joy", "upbeat", "celebration")
+  }
+  if (
+    text.includes("dance") ||
+    text.includes("beat") ||
+    text.includes("energy") ||
+    text.includes("pump") ||
+    text.includes("rock")
+  ) {
+    moods.push("energetic", "upbeat")
+  }
+  if (
+    text.includes("calm") ||
+    text.includes("peace") ||
+    text.includes("relax") ||
+    text.includes("quiet") ||
+    text.includes("soft")
+  ) {
+    moods.push("peaceful", "contemplative")
+  }
+  if (
+    text.includes("motivat") ||
+    text.includes("strong") ||
+    text.includes("power") ||
+    text.includes("fight") ||
+    text.includes("win")
+  ) {
+    moods.push("motivational", "empowerment")
+  }
+  if (
+    text.includes("memory") ||
+    text.includes("remember") ||
+    text.includes("past") ||
+    text.includes("yesterday") ||
+    text.includes("old")
+  ) {
+    moods.push("nostalgia", "contemplative")
+  }
+  if (text.includes("alone") || text.includes("lonely") || text.includes("empty") || text.includes("miss")) {
+    moods.push("lonely", "melancholy")
+  }
+
+  // Genre-based mood assignment
+  if (text.includes("blues")) moods.push("melancholy", "contemplative")
+  if (text.includes("jazz")) moods.push("contemplative", "peaceful")
+  if (text.includes("classical")) moods.push("peaceful", "epic")
+  if (text.includes("metal") || text.includes("punk")) moods.push("energetic", "dramatic")
+  if (text.includes("folk")) moods.push("contemplative", "nostalgia")
+  if (text.includes("pop")) moods.push("upbeat", "joy")
+  if (text.includes("rap") || text.includes("hip hop")) moods.push("energetic", "empowerment")
+
+  // Default moods if none detected
+  if (moods.length === 0) {
+    if (text.includes("slow") || text.includes("ballad")) {
+      moods.push("tender", "contemplative")
+    } else if (text.includes("fast") || text.includes("up")) {
+      moods.push("energetic", "upbeat")
+    } else {
+      moods.push("contemplative", "peaceful")
+    }
+  }
+
+  return [...new Set(moods)] // Remove duplicates
+}
+
+// Function to get primary emotion from moods
+const getPrimaryEmotion = (moods: string[]): string => {
+  const emotionPriority = [
+    "love",
+    "joy",
+    "energetic",
+    "peaceful",
+    "empowerment",
+    "nostalgia",
+    "contemplative",
+    "melancholy",
+  ]
+  for (const emotion of emotionPriority) {
+    if (moods.includes(emotion)) return emotion
+  }
+  return moods[0] || "contemplative"
+}
+
+// Function to fetch songs from a specific Saavn album
+const fetchSongsFromAlbum = async (albumId: string): Promise<Song[]> => {
+  try {
+    const res = await fetch(`https://saavn.dev/api/albums?id=${encodeURIComponent(albumId)}`)
+    const data = await res.json()
+    if (data.success && data.data && data.data.length > 0 && data.data[0].songs) {
+      const albumSongs = data.data[0].songs
+      return albumSongs.map((saavnSong: any) => {
+        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
+        const moods = assignMoodToSong(saavnSong.name, artist)
+        const emotion = getPrimaryEmotion(moods)
+        return {
+          id: `saavn_${saavnSong.id}`,
+          title: saavnSong.name,
+          artist: artist,
+          primaryArtists: artist,
+          mood: moods,
+          emotion: emotion,
+          coverUrl:
+            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+            saavnSong.image?.[saavnSong.image.length - 1]?.url ||
+            "/placeholder.svg?height=300&width=300",
+          audioUrl:
+            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+            saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
+            "",
+          previewUrl: "",
+          externalUrl: saavnSong.url || "",
+          messages: [], // Will be populated later
+          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+          duration: saavnSong.duration || 180,
+          source: "saavn",
+        }
+      })
+    }
+    return []
+  } catch (error) {
+    console.error(`Error fetching songs for album ${albumId}:`, error)
+    return []
+  }
+}
+
+// Function to fetch songs from Saavn API
+const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
+  try {
+    const res = await fetch(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`)
+    const data = await res.json()
+    if (data.success && data.data && data.data.results) {
+      return data.data.results.map((saavnSong: any) => {
+        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
+        const moods = assignMoodToSong(saavnSong.name, artist)
+        const emotion = getPrimaryEmotion(moods)
+        return {
+          id: `saavn_${saavnSong.id}`,
+          title: saavnSong.name,
+          artist: artist,
+          primaryArtists: artist,
+          mood: moods,
+          emotion: emotion,
+          coverUrl:
+            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+            saavnSong.image?.[saavnSong.image.length - 1]?.url ||
+            "/placeholder.svg?height=300&width=300",
+          audioUrl:
+            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+            saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
+            "",
+          previewUrl: "",
+          externalUrl: saavnSong.url || "",
+          messages: [], // Will be populated later
+          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+          duration: saavnSong.duration || 180,
+          source: "saavn",
+        }
+      })
+    }
+    return []
+  } catch (error) {
+    console.error("Error fetching Saavn songs:", error)
+    return []
+  }
+}
+
+// Function to fetch music from YouTube API
+const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
+  try {
+    // IMPORTANT: Replace 'YOUR_YOUTUBE_API_KEY' with your actual YouTube Data API v3 key.
+    // You can get one from the Google Cloud Console.
+    const YOUTUBE_API_KEY = "YOUR_YOUTUBE_API_KEY"
+    const YOUTUBE_API_ENDPOINT = "https://www.googleapis.com/youtube/v3/search"
+
+    const res = await fetch(
+      `${YOUTUBE_API_ENDPOINT}?part=snippet&q=${encodeURIComponent(
+        query,
+      )}&type=video&videoCategoryId=10&maxResults=10&key=${YOUTUBE_API_KEY}`,
+    )
+    const data = await res.json()
+    if (data.items) {
+      const youtubeSongs: Song[] = []
+      for (const item of data.items) {
+        // Filter for music videos using heuristics
+        const isMusicVideo =
+          item.id.kind === "youtube#video" &&
+          (item.snippet.channelTitle.toLowerCase().includes("vevo") ||
+            item.snippet.channelTitle.toLowerCase().includes("official artist channel") ||
+            item.snippet.title.toLowerCase().includes("official audio") ||
+            item.snippet.title.toLowerCase().includes("music video") ||
+            item.snippet.title.toLowerCase().includes("lyrics") ||
+            item.snippet.description.toLowerCase().includes("official music video"))
+        if (isMusicVideo) {
+          const artist = item.snippet.channelTitle || "Unknown Artist"
+          const moods = assignMoodToSong(item.snippet.title, artist)
+          const emotion = getPrimaryEmotion(moods)
+          youtubeSongs.push({
+            id: `youtube_${item.id.videoId}`,
+            title: item.snippet.title,
+            artist: artist,
+            primaryArtists: artist,
+            mood: moods,
+            emotion: emotion,
+            coverUrl: item.snippet.thumbnails.high.url || "/placeholder.svg?height=300&width=300",
+            audioUrl: "", // YouTube API does not provide direct audio URLs
+            previewUrl: "",
+            externalUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+            messages: [],
+            plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder plays
+            duration: 240, // Placeholder duration, YouTube search API doesn't provide it
+            source: "youtube",
+          })
+        }
+      }
+      return youtubeSongs
+    }
+    return []
+  } catch (error) {
+    console.error("Error fetching YouTube music:", error)
+    return []
+  }
+}
+
+// Function to fetch a song by ID
+const fetchSongById = async (
+  id: string,
+  allMessages: AnonymousMessage[] = [],
+  songs: Song[] = [],
+): Promise<Song | null> => {
+  if (id.startsWith("saavn_")) {
+    try {
+      const saavnId = id.replace("saavn_", "")
+      const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`)
+      const data = await res.json()
+      if (data.success && data.data && data.data.length > 0) {
+        const saavnSong = data.data[0]
+        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
+        const moods = assignMoodToSong(saavnSong.name, artist)
+        const emotion = getPrimaryEmotion(moods)
+        return {
+          id: `saavn_${saavnSong.id}`,
+          title: saavnSong.name,
+          artist: artist,
+          primaryArtists: artist,
+          mood: moods,
+          emotion: emotion,
+          coverUrl:
+            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
+            saavnSong.image?.[saavnSong.image.length - 1]?.url ||
+            "/placeholder.svg?height=300&width=300",
+          audioUrl:
+            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
+            saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
+            "",
+          previewUrl: "",
+          externalUrl: saavnSong.url || "",
+          messages: [], // No messages available in this scope
+          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
+          duration: saavnSong.duration || 180,
+          source: "saavn",
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching Saavn song by ID:", error)
+    }
+  } else if (id.startsWith("youtube_")) {
+    // For YouTube songs, we don't have a direct "get by ID" endpoint for full details
+    // We can try to reconstruct it if needed, but for now, assume it's in `allMessages`
+    const youtubeId = id.replace("youtube_", "")
+    // This is a simplified reconstruction, as the nocodeapi doesn't have a direct song endpoint
+    // In a real app, you'd need to store more metadata or use a different YouTube API endpoint
+    const messageForSong = allMessages.find((msg) => msg.songId === id)
+    if (messageForSong) {
+      // Try to find the song in the current songs array
+      const existingSong = songs.find((s) => s.id === id)
+      if (existingSong) return existingSong
+    }
+  }
+  return null
+}
+
+// Fallback songs when APIs fail
+const getFallbackSongs = (query: string): Song[] => {
+  const fallbackTracks = [
+    {
+      id: "fallback_1",
+      title: "Tum Hi Ho",
+      artist: "Arijit Singh",
+      primaryArtists: "Arijit Singh",
+      mood: ["love", "romantic", "tender"],
+      emotion: "love",
+      coverUrl: "/placeholder.svg?height=300&width=300",
+      audioUrl: "",
+      previewUrl: "",
+      externalUrl: "",
+      messages: [],
+      plays: 2500000,
+      duration: 262,
+      source: "saavn" as const,
+    },
+    {
+      id: "fallback_2",
+      title: "Raabta",
+      artist: "Arijit Singh",
+      primaryArtists: "Arijit Singh",
+      mood: ["love", "romantic", "tender"],
+      emotion: "love",
+      coverUrl: "/placeholder.svg?height=300&width=300",
+      audioUrl: "",
+      previewUrl: "",
+      externalUrl: "",
+      messages: [],
+      plays: 1800000,
+      duration: 245,
+      source: "saavn" as const,
+    },
+    {
+      id: "fallback_3",
+      title: "Channa Mereya",
+      artist: "Arijit Singh",
+      primaryArtists: "Arijit Singh",
+      mood: ["melancholy", "contemplative", "tender"],
+      emotion: "melancholy",
+      coverUrl: "/placeholder.svg?height=300&width=300",
+      audioUrl: "",
+      previewUrl: "",
+      externalUrl: "",
+      messages: [],
+      plays: 3200000,
+      duration: 258,
+      source: "saavn" as const,
+    },
+    {
+      id: "fallback_4",
+      title: "Shape of You",
+      artist: "Ed Sheeran",
+      primaryArtists: "Ed Sheeran",
+      mood: ["upbeat", "energetic", "love"],
+      emotion: "upbeat",
+      coverUrl: "/placeholder.svg?height=300&width=300",
+      audioUrl: "",
+      previewUrl: "",
+      externalUrl: "",
+      messages: [],
+      plays: 5000000,
+      duration: 233,
+      source: "youtube" as const,
+    },
+    {
+      id: "fallback_5",
+      title: "Despacito",
+      artist: "Luis Fonsi ft. Daddy Yankee",
+      primaryArtists: "Luis Fonsi, Daddy Yankee",
+      mood: ["upbeat", "energetic", "romantic"],
+      emotion: "upbeat",
+      coverUrl: "/placeholder.svg?height=300&width=300",
+      audioUrl: "",
+      previewUrl: "",
+      externalUrl: "",
+      messages: [],
+      plays: 4500000,
+      duration: 270,
+      source: "youtube" as const,
+    },
+  ]
+  // Filter fallback songs based on query if provided
+  if (query && query.trim()) {
+    const lowerQuery = query.toLowerCase()
+    return fallbackTracks.filter(
+      (track) =>
+        track.title.toLowerCase().includes(lowerQuery) ||
+        track.artist.toLowerCase().includes(lowerQuery) ||
+        track.mood.some((mood) => mood.toLowerCase().includes(lowerQuery)),
+    )
+  }
+  return fallbackTracks
+}
+
+// Load initial songs from Saavn and YouTube APIs
+const loadInitialSongs = async (): Promise<Song[]> => {
+  try {
+    const saavnQueries = [
+      "bollywood hits",
+      "arijit singh",
+      "hindi songs",
+      "romantic songs",
+      "latest bollywood",
+      "punjabi songs",
+      "telugu songs", // Removed "tamil songs"
+      "trending songs",
+      "popular music",
+    ]
+    const youtubeQueries = [
+      "popular english songs",
+      "trending music videos",
+      "top global hits",
+      "lofi hip hop",
+      "relaxing music",
+    ]
+
+    const saavnPromises = saavnQueries.map((query) => fetchSaavnSongs(query))
+    const youtubePromises = youtubeQueries.map((query) => fetchYouTubeMusic(query))
+
+    const [saavnResults, youtubeResults] = await Promise.all([Promise.all(saavnPromises), Promise.all(youtubePromises)])
+
+    const allSongs: Song[] = []
+    saavnResults.forEach((songs) => allSongs.push(...songs))
+    youtubeResults.forEach((songs) => allSongs.push(...songs))
+
+    // If no songs were fetched, use fallback
+    if (allSongs.length === 0) {
+      allSongs.push(...getFallbackSongs(""))
+    }
+
+    // Remove duplicates and shuffle
+    const uniqueSongs = allSongs
+      .filter(
+        (song, index, self) => index === self.findIndex((s) => s.title === song.title && s.artist === song.artist),
+      )
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 150) // Increased limit for more songs
+
+    return uniqueSongs
+  } catch (error) {
+    console.error("Error loading initial songs:", error)
+    return getFallbackSongs("")
+  }
+}
+
 export default function VibraApp() {
+  // Add new state variables at the top of the `VibraApp` component, alongside other `useState` declarations:
+  const [youTubePlayerOpen, setYouTubePlayerOpen] = useState(false)
+  const [currentYouTubeVideoId, setCurrentYouTubeVideoId] = useState<string | null>(null)
+  const [currentYouTubeSongTitle, setCurrentYouTubeSongTitle] = useState<string | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [searchQuery, setSearchQuery] = useState("")
@@ -255,6 +738,7 @@ export default function VibraApp() {
     try {
       // 1. First load songs
       const initialSongs = await loadInitialSongs()
+
       // 2. Then load messages
       const messagesRef = collection(db, "messages")
       const q = query(messagesRef, orderBy("timestamp", "desc"))
@@ -272,6 +756,7 @@ export default function VibraApp() {
           likedBy: data.likedBy || [],
         })
       })
+
       // 3. Associate messages with songs before setting state
       const songsWithMessages = initialSongs.map((song) => ({
         ...song,
@@ -279,6 +764,7 @@ export default function VibraApp() {
       }))
       setSongs(songsWithMessages)
       setAllMessages(initialMessages)
+
       // 4. Set up real-time listener
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const updatedMessages: AnonymousMessage[] = []
@@ -333,7 +819,6 @@ export default function VibraApp() {
         setShowScrollToTop(false)
       }
     }
-
     window.addEventListener("scroll", handleScroll)
     return () => {
       window.removeEventListener("scroll", handleScroll)
@@ -347,388 +832,7 @@ export default function VibraApp() {
     })
   }
 
-  // Function to assign mood based on song title and artist
-  const assignMoodToSong = (title: string, artist: string): string[] => {
-    const lowerTitle = title.toLowerCase()
-    const lowerArtist = artist.toLowerCase()
-    const text = `${lowerTitle} ${lowerArtist}`
-    const moods: string[] = []
-    if (text.includes("love") || text.includes("heart") || text.includes("romantic") || text.includes("kiss")) {
-      moods.push("love", "romantic")
-    }
-    if (
-      text.includes("sad") ||
-      text.includes("cry") ||
-      text.includes("tear") ||
-      text.includes("broken") ||
-      text.includes("hurt") ||
-      text.includes("pain")
-    ) {
-      moods.push("melancholy")
-    }
-    if (
-      text.includes("happy") ||
-      text.includes("joy") ||
-      text.includes("celebration") ||
-      text.includes("party") ||
-      text.includes("smile")
-    ) {
-      moods.push("joy", "upbeat", "celebration")
-    }
-    if (
-      text.includes("dance") ||
-      text.includes("beat") ||
-      text.includes("energy") ||
-      text.includes("pump") ||
-      text.includes("rock")
-    ) {
-      moods.push("energetic", "upbeat")
-    }
-    if (
-      text.includes("calm") ||
-      text.includes("peace") ||
-      text.includes("relax") ||
-      text.includes("quiet") ||
-      text.includes("soft")
-    ) {
-      moods.push("peaceful", "contemplative")
-    }
-    if (
-      text.includes("motivat") ||
-      text.includes("strong") ||
-      text.includes("power") ||
-      text.includes("fight") ||
-      text.includes("win")
-    ) {
-      moods.push("motivational", "empowerment")
-    }
-    if (
-      text.includes("memory") ||
-      text.includes("remember") ||
-      text.includes("past") ||
-      text.includes("yesterday") ||
-      text.includes("old")
-    ) {
-      moods.push("nostalgia", "contemplative")
-    }
-    if (text.includes("alone") || text.includes("lonely") || text.includes("empty") || text.includes("miss")) {
-      moods.push("lonely", "melancholy")
-    }
-    // Genre-based mood assignment
-    if (text.includes("blues")) moods.push("melancholy", "contemplative")
-    if (text.includes("jazz")) moods.push("contemplative", "peaceful")
-    if (text.includes("classical")) moods.push("peaceful", "epic")
-    if (text.includes("metal") || text.includes("punk")) moods.push("energetic", "dramatic")
-    if (text.includes("folk")) moods.push("contemplative", "nostalgia")
-    if (text.includes("pop")) moods.push("upbeat", "joy")
-    if (text.includes("rap") || text.includes("hip hop")) moods.push("energetic", "empowerment")
-    // Default moods if none detected
-    if (moods.length === 0) {
-      if (text.includes("slow") || text.includes("ballad")) {
-        moods.push("tender", "contemplative")
-      } else if (text.includes("fast") || text.includes("up")) {
-        moods.push("energetic", "upbeat")
-      } else {
-        moods.push("contemplative", "peaceful")
-      }
-    }
-    return [...new Set(moods)] // Remove duplicates
-  }
-
-  // Function to get primary emotion from moods
-  const getPrimaryEmotion = (moods: string[]): string => {
-    const emotionPriority = [
-      "love",
-      "joy",
-      "energetic",
-      "peaceful",
-      "empowerment",
-      "nostalgia",
-      "contemplative",
-      "melancholy",
-    ]
-    for (const emotion of emotionPriority) {
-      if (moods.includes(emotion)) return emotion
-    }
-    return moods[0] || "contemplative"
-  }
-
-  // Function to fetch songs from Saavn API
-  const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
-    try {
-      const res = await fetch(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`)
-      const data = await res.json()
-      if (data.success && data.data && data.data.results) {
-        return data.data.results.slice(0, 30).map((saavnSong: any) => {
-          const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
-          const moods = assignMoodToSong(saavnSong.name, artist)
-          const emotion = getPrimaryEmotion(moods)
-          return {
-            id: `saavn_${saavnSong.id}`,
-            title: saavnSong.name,
-            artist: artist,
-            primaryArtists: artist,
-            mood: moods,
-            emotion: emotion,
-            coverUrl:
-              saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
-              saavnSong.image?.[saavnSong.image.length - 1]?.url ||
-              "/placeholder.svg?height=300&width=300",
-            audioUrl:
-              saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
-              saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
-              "",
-            previewUrl: "",
-            externalUrl: saavnSong.url || "",
-            messages: [], // Will be populated later
-            plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
-            duration: saavnSong.duration || 180,
-            source: "saavn",
-          }
-        })
-      }
-      return []
-    } catch (error) {
-      console.error("Error fetching Saavn songs:", error)
-      return []
-    }
-  }
-
-  // Function to fetch music from YouTube API
-  const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
-    try {
-      const res = await fetch(
-        `https://v1.nocodeapi.com/anjalii1223/yt/TQzqNLsXCDaFUJUv/search?q=${encodeURIComponent(query)}`,
-      )
-      const data = await res.json()
-      if (data.items) {
-        const youtubeSongs: Song[] = []
-        for (const item of data.items) {
-          // Filter for music videos using heuristics
-          const isMusicVideo =
-            item.id.kind === "youtube#video" &&
-            (item.snippet.channelTitle.toLowerCase().includes("vevo") ||
-              item.snippet.channelTitle.toLowerCase().includes("official artist channel") ||
-              item.snippet.title.toLowerCase().includes("official audio") ||
-              item.snippet.title.toLowerCase().includes("music video") ||
-              item.snippet.title.toLowerCase().includes("lyrics") ||
-              item.snippet.description.toLowerCase().includes("official music video"))
-
-          if (isMusicVideo) {
-            const artist = item.snippet.channelTitle || "Unknown Artist"
-            const moods = assignMoodToSong(item.snippet.title, artist)
-            const emotion = getPrimaryEmotion(moods)
-            youtubeSongs.push({
-              id: `youtube_${item.id.videoId}`,
-              title: item.snippet.title,
-              artist: artist,
-              primaryArtists: artist,
-              mood: moods,
-              emotion: emotion,
-              coverUrl: item.snippet.thumbnails.high.url || "/placeholder.svg?height=300&width=300",
-              audioUrl: "", // YouTube API does not provide direct audio URLs
-              previewUrl: "",
-              externalUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-              messages: [],
-              plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder plays
-              duration: 240, // Placeholder duration, YouTube search API doesn't provide it
-              source: "youtube",
-            })
-          }
-        }
-        return youtubeSongs.slice(0, 20) // Limit results
-      }
-      return []
-    } catch (error) {
-      console.error("Error fetching YouTube music:", error)
-      return []
-    }
-  }
-
-  // Function to fetch a song by ID
-  const fetchSongById = async (id: string): Promise<Song | null> => {
-    if (id.startsWith("saavn_")) {
-      try {
-        const saavnId = id.replace("saavn_", "")
-        const res = await fetch(`https://saavn.dev/api/songs?id=${saavnId}`)
-        const data = await res.json()
-        if (data.success && data.data && data.data.length > 0) {
-          const saavnSong = data.data[0]
-          const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
-          const moods = assignMoodToSong(saavnSong.name, artist)
-          const emotion = getPrimaryEmotion(moods)
-          return {
-            id: `saavn_${saavnSong.id}`,
-            title: saavnSong.name,
-            artist: artist,
-            primaryArtists: artist,
-            mood: moods,
-            emotion: emotion,
-            coverUrl:
-              saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
-              saavnSong.image?.[saavnSong.image.length - 1]?.url ||
-              "/placeholder.svg?height=300&width=300",
-            audioUrl:
-              saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
-              saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
-              "",
-            previewUrl: "",
-            externalUrl: saavnSong.url || "",
-            messages: allMessages.filter((msg) => msg.songId === `saavn_${saavnSong.id}`),
-            plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
-            duration: saavnSong.duration || 180,
-            source: "saavn",
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching Saavn song by ID:", error)
-      }
-    } else if (id.startsWith("youtube_")) {
-      // For YouTube songs, we don't have a direct "get by ID" endpoint for full details
-      // We can try to reconstruct it if needed, but for now, assume it's in `allMessages`
-      const youtubeId = id.replace("youtube_", "")
-      // This is a simplified reconstruction, as the nocodeapi doesn't have a direct song endpoint
-      // In a real app, you'd need to store more metadata or use a different YouTube API endpoint
-      const messageForSong = allMessages.find((msg) => msg.songId === id)
-      if (messageForSong) {
-        // Try to find the song in the current songs array
-        const existingSong = songs.find((s) => s.id === id)
-        if (existingSong) return existingSong
-      }
-    }
-    return null
-  }
-
-  // Fallback songs when APIs fail
-  const getFallbackSongs = (query: string): Song[] => {
-    const fallbackTracks = [
-      {
-        id: "fallback_1",
-        title: "Tum Hi Ho",
-        artist: "Arijit Singh",
-        primaryArtists: "Arijit Singh",
-        mood: ["love", "romantic", "tender"],
-        emotion: "love",
-        coverUrl: "/placeholder.svg?height=300&width=300",
-        audioUrl: "",
-        previewUrl: "",
-        externalUrl: "",
-        messages: [],
-        plays: 2500000,
-        duration: 262,
-        source: "saavn" as const,
-      },
-      {
-        id: "fallback_2",
-        title: "Raabta",
-        artist: "Arijit Singh",
-        primaryArtists: "Arijit Singh",
-        mood: ["love", "romantic", "tender"],
-        emotion: "love",
-        coverUrl: "/placeholder.svg?height=300&width=300",
-        audioUrl: "",
-        previewUrl: "",
-        externalUrl: "",
-        messages: [],
-        plays: 1800000,
-        duration: 245,
-        source: "saavn" as const,
-      },
-      {
-        id: "fallback_3",
-        title: "Channa Mereya",
-        artist: "Arijit Singh",
-        primaryArtists: "Arijit Singh",
-        mood: ["melancholy", "contemplative", "tender"],
-        emotion: "melancholy",
-        coverUrl: "/placeholder.svg?height=300&width=300",
-        audioUrl: "",
-        previewUrl: "",
-        externalUrl: "",
-        messages: [],
-        plays: 3200000,
-        duration: 258,
-        source: "saavn" as const,
-      },
-    ]
-    // Filter fallback songs based on query if provided
-    if (query && query.trim()) {
-      const lowerQuery = query.toLowerCase()
-      return fallbackTracks.filter(
-        (track) =>
-          track.title.toLowerCase().includes(lowerQuery) ||
-          track.artist.toLowerCase().includes(lowerQuery) ||
-          track.mood.some((mood) => mood.toLowerCase().includes(lowerQuery)),
-      )
-    }
-    return fallbackTracks
-  }
-
-  // Load initial songs from Saavn API
-  const loadInitialSongs = async (): Promise<Song[]> => {
-    try {
-      const queries = [
-        "bollywood hits",
-        "arijit singh",
-        "hindi songs",
-        "romantic songs",
-        "latest bollywood",
-        "punjabi songs",
-        "tamil songs",
-        "telugu songs",
-        "trending songs",
-        "popular music",
-      ]
-      const allSongs: Song[] = []
-      // Fetch from Saavn API
-      const saavnPromises = queries.map(async (query) => {
-        try {
-          const songs = await fetchSaavnSongs(query)
-          return songs
-        } catch (error) {
-          console.error(`Failed to fetch Saavn songs for query "${query}":`, error)
-          return []
-        }
-      })
-      const saavnResults = await Promise.all(saavnPromises)
-      saavnResults.forEach((songs) => allSongs.push(...songs))
-
-      // If Saavn didn't return enough songs, try YouTube
-      if (allSongs.length < 50) {
-        // Threshold for trying YouTube
-        const youtubeQueries = ["popular english songs", "bollywood music", "trending music videos"]
-        const youtubePromises = youtubeQueries.map(async (query) => {
-          try {
-            const songs = await fetchYouTubeMusic(query)
-            return songs
-          } catch (error) {
-            console.error(`Failed to fetch YouTube music for query "${query}":`, error)
-            return []
-          }
-        })
-        const youtubeResults = await Promise.all(youtubePromises)
-        youtubeResults.forEach((songs) => allSongs.push(...songs))
-      }
-
-      // If no songs were fetched, use fallback
-      if (allSongs.length === 0) {
-        allSongs.push(...getFallbackSongs(""))
-      }
-      // Remove duplicates and shuffle
-      const uniqueSongs = allSongs
-        .filter(
-          (song, index, self) => index === self.findIndex((s) => s.title === song.title && s.artist === song.artist),
-        )
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 100)
-      return uniqueSongs
-    } catch (error) {
-      console.error("Error loading initial songs:", error)
-      return getFallbackSongs("")
-    }
-  }
-
-  // Search songs from Saavn API
+  // Search songs from Saavn and YouTube APIs
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
       loadInitialData()
@@ -736,17 +840,17 @@ export default function VibraApp() {
     }
     setIsLoading(true)
     try {
-      const results: Song[] = []
+      const [saavnResults, youtubeResults] = await Promise.all([
+        fetchSaavnSongs(searchQuery),
+        fetchYouTubeMusic(searchQuery),
+      ])
 
-      // 1. Try Saavn first
-      const saavnResults = await fetchSaavnSongs(searchQuery)
-      results.push(...saavnResults)
+      // New: Search for albums and fetch their songs
+      const albumResults = await fetchSaavnAlbums(searchQuery)
+      const albumSongPromises = albumResults.map((album) => fetchSongsFromAlbum(album.id))
+      const songsFromAlbums = (await Promise.all(albumSongPromises)).flat()
 
-      // 2. If Saavn yields no results, try YouTube
-      if (results.length === 0) {
-        const youtubeResults = await fetchYouTubeMusic(searchQuery)
-        results.push(...youtubeResults)
-      }
+      const combinedResults: Song[] = [...saavnResults, ...youtubeResults, ...songsFromAlbums]
 
       // Also search messages (this part remains the same)
       const messagesSnapshot = await getDocs(
@@ -757,15 +861,16 @@ export default function VibraApp() {
         ),
       )
       const songIds = [...new Set(messagesSnapshot.docs.map((d) => d.data().songId))]
-      const songPromises = songIds.map((id) => fetchSongById(id))
+      const songPromises = songIds.map((id) => fetchSongById(id, allMessages, songs))
       const newSongs = (await Promise.all(songPromises)).filter(Boolean)
-      // Combine results
-      const combinedSongs = [...results, ...newSongs].filter(
+
+      // Combine all results and deduplicate
+      combinedResults.push(...(newSongs as Song[]))
+      const uniqueSongs = combinedResults.filter(
         (song, index, self) => song && index === self.findIndex((s) => s && s.id === song.id),
       )
-      setSongs(
-        combinedSongs.length > 0 ? combinedSongs.filter((s): s is Song => s !== null) : getFallbackSongs(searchQuery),
-      )
+
+      setSongs(uniqueSongs.length > 0 ? uniqueSongs : getFallbackSongs(searchQuery))
     } catch (error) {
       console.error("Error searching songs:", error)
       setSongs(getFallbackSongs(searchQuery))
@@ -774,7 +879,7 @@ export default function VibraApp() {
     }
   }
 
-  // Filter by mood
+  // Filter by mood from Saavn and YouTube APIs
   const handleMoodFilter = async (mood: string) => {
     setSelectedMood(mood)
     if (!mood) {
@@ -784,26 +889,19 @@ export default function VibraApp() {
     setIsLoading(true)
     try {
       const queries = moodQueries[mood as keyof typeof moodQueries] || [mood]
-      const allSongs: Song[] = []
-      // Try Saavn first
+      const allPromises: Promise<Song[]>[] = []
       for (const query of queries.slice(0, 3)) {
-        const songs = await fetchSaavnSongs(query)
-        allSongs.push(...songs)
+        allPromises.push(fetchSaavnSongs(query))
+        allPromises.push(fetchYouTubeMusic(query))
       }
-
-      // If Saavn didn't return enough songs, try YouTube
-      if (allSongs.length < 20) {
-        // Threshold for trying YouTube
-        for (const query of queries.slice(0, 3)) {
-          const songs = await fetchYouTubeMusic(query)
-          allSongs.push(...songs)
-        }
-      }
+      const resultsArrays = await Promise.all(allPromises)
+      const allSongs: Song[] = resultsArrays.flat()
 
       if (allSongs.length === 0) {
         const fallbackSongs = getFallbackSongs("").filter((song) => song.mood.includes(mood))
         allSongs.push(...fallbackSongs)
       }
+
       const uniqueSongs = allSongs.filter(
         (song, index, self) => index === self.findIndex((s) => s.title === song.title && s.artist === song.artist),
       )
@@ -930,11 +1028,13 @@ export default function VibraApp() {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
       if (!playlist) return
+
       // Check if song already exists in playlist
       if (playlist.songs.some((s) => s.id === song.id)) {
         toast.info(`"${song.title}" is already in "${playlist.name}"`)
         return
       }
+
       const updatedSongs = [...playlist.songs, song]
       if (playlist.firebaseId) {
         await updateDoc(doc(db, "playlists", playlist.firebaseId), {
@@ -1000,14 +1100,16 @@ export default function VibraApp() {
         likedBy: [],
       }
       await addDoc(collection(db, "messages"), messageData)
+
       // Check if song exists in current state
       const songExists = songs.some((s) => s.id === songId)
       if (!songExists) {
-        const newSong = await fetchSongById(songId)
+        const newSong = await fetchSongById(songId, allMessages, songs)
         if (newSong) {
           setSongs((prev) => [...prev, newSong])
         }
       }
+
       setMessageSuccess(true)
       setNewMessage("")
       toast.success("Your anonymous message has been shared")
@@ -1031,11 +1133,13 @@ export default function VibraApp() {
       const messageRef = doc(db, "messages", messageId)
       const message = allMessages.find((m) => m.id === messageId)
       if (!message) return
+
       // Check if user already liked this message
       if (message.likedBy.includes(firebaseUser.uid)) {
         toast.info("You've already liked this message")
         return
       }
+
       await updateDoc(messageRef, {
         likes: increment(1),
         likedBy: arrayUnion(firebaseUser.uid),
@@ -1066,12 +1170,15 @@ export default function VibraApp() {
       clearInterval(progressInterval.current)
       progressInterval.current = null
     }
+
     if (song.audioUrl) {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
+
       // Set initial progress
       setCurrentTime(0)
       setPlaybackProgress(0)
+
       // Update progress while playing
       const updateProgress = () => {
         if (audio.duration) {
@@ -1082,6 +1189,7 @@ export default function VibraApp() {
       }
       progressInterval.current = setInterval(updateProgress, 1000)
       audio.addEventListener("timeupdate", updateProgress)
+
       audio
         .play()
         .then(() => {
@@ -1099,6 +1207,7 @@ export default function VibraApp() {
           console.error("Error playing audio:", error)
           toast.error("Failed to play audio")
         })
+
       audio.onended = () => {
         if (progressInterval.current) {
           clearInterval(progressInterval.current)
@@ -1148,7 +1257,6 @@ export default function VibraApp() {
     if (!currentlyPlaying || currentQueue.length === 0) return
 
     let nextIndex = currentIndex + 1
-
     if (nextIndex >= currentQueue.length) {
       if (repeatMode === "all") {
         nextIndex = 0
@@ -1162,6 +1270,7 @@ export default function VibraApp() {
         return
       }
     }
+
     if (currentPlaylist) {
       // Only update currentSongIndex if it's a playlist
       setCurrentSongIndex(nextIndex)
@@ -1182,7 +1291,6 @@ export default function VibraApp() {
     }
 
     let prevIndex = currentIndex - 1
-
     if (prevIndex < 0) {
       if (repeatMode === "all") {
         prevIndex = currentQueue.length - 1
@@ -1192,6 +1300,7 @@ export default function VibraApp() {
         return
       }
     }
+
     if (currentPlaylist) {
       // Only update currentSongIndex if it's a playlist
       setCurrentSongIndex(prevIndex)
@@ -1207,22 +1316,91 @@ export default function VibraApp() {
     toast.success(`Repeat mode: ${modes[nextIndex]}`)
   }
 
-  // Play/Pause audio
+  // Modify the `togglePlayback` function to handle YouTube embeds:
   const togglePlayback = (song: Song) => {
+    // Pause any currently playing audio
+    if (currentAudio) {
+      currentAudio.pause()
+      setCurrentAudio(null)
+    }
+
+    // Close any open YouTube player
+    setYouTubePlayerOpen(false)
+    setCurrentYouTubeVideoId(null)
+    setCurrentYouTubeSongTitle(null)
+
     if (currentlyPlaying === song.id) {
-      // Pause current song
-      if (currentAudio) {
-        currentAudio.pause()
-        setCurrentAudio(null)
-      }
+      // If the same song is clicked, pause it
       setCurrentlyPlaying(null)
       toast.info(`Paused: ${song.title}`)
     } else {
-      // Play new song - clear playlist context if playing individual song
+      // Play new song
+      if (song.audioUrl) {
+        const audio = new Audio(song.audioUrl)
+        audio.crossOrigin = "anonymous"
+
+        // Set initial progress
+        setCurrentTime(0)
+        setPlaybackProgress(0)
+
+        // Update progress while playing
+        const updateProgress = () => {
+          if (audio.duration) {
+            const progress = (audio.currentTime / audio.duration) * 100
+            setPlaybackProgress(progress)
+            setCurrentTime(audio.currentTime)
+          }
+        }
+        progressInterval.current = setInterval(updateProgress, 1000)
+        audio.addEventListener("timeupdate", updateProgress)
+
+        audio
+          .play()
+          .then(() => {
+            setCurrentAudio(audio)
+            setCurrentlyPlaying(song.id)
+            // If playing from playlist, find the current index
+            if (currentPlaylist) {
+              const index = currentPlaylist.songs.findIndex((s) => s.id === song.id)
+              if (index >= 0) {
+                setCurrentSongIndex(index)
+              }
+            }
+          })
+          .catch((error) => {
+            console.error("Error playing audio:", error)
+            toast.error("Failed to play audio")
+          })
+
+        audio.onended = () => {
+          if (progressInterval.current) {
+            clearInterval(progressInterval.current)
+            progressInterval.current = null
+          }
+          audio.removeEventListener("timeupdate", updateProgress)
+          handleSongEnd()
+        }
+      } else if (song.source === "youtube" && song.id.startsWith("youtube_")) {
+        const videoId = song.id.replace("youtube_", "")
+        setCurrentYouTubeVideoId(videoId)
+        setCurrentYouTubeSongTitle(`${song.title} - ${song.artist}`)
+        setYouTubePlayerOpen(true)
+        setCurrentlyPlaying(song.id) // Mark as currently playing
+        toast.info(`Playing YouTube: ${song.title}`)
+        // For YouTube, progress is not tracked via HTMLAudioElement, so reset/hide progress bar
+        setCurrentTime(0)
+        setPlaybackProgress(0)
+        if (progressInterval.current) {
+          clearInterval(progressInterval.current)
+          progressInterval.current = null
+        }
+      } else {
+        toast.error("No playable source available for this song.")
+      }
+      // Clear playlist context if playing individual song
       if (!currentPlaylist || !currentPlaylist.songs.some((s) => s.id === song.id)) {
         setCurrentPlaylist(null)
       }
-      playSpecificSong(song)
     }
   }
 
@@ -1241,11 +1419,14 @@ export default function VibraApp() {
     const happyWords = ["happy", "joy", "love", "excited", "amazing", "wonderful", "great", "awesome", "fantastic"]
     const anxiousWords = ["worried", "stress", "scared", "nervous", "anxious", "fear", "panic", "overwhelmed"]
     const angryWords = ["angry", "mad", "furious", "hate", "rage", "annoyed", "frustrated", "pissed"]
+
     const lowerText = text.toLowerCase()
+
     if (sadWords.some((word) => lowerText.includes(word))) return "melancholy"
     if (happyWords.some((word) => lowerText.includes(word))) return "joy"
     if (anxiousWords.some((word) => lowerText.includes(word))) return "anxiety"
     if (angryWords.some((word) => lowerText.includes(word))) return "empowerment"
+
     return "contemplative"
   }
 
@@ -1287,12 +1468,14 @@ export default function VibraApp() {
                 Feel the music, speak the unspoken.
               </p>
             </div>
+
             {/* Mobile Menu Button */}
             <div className="flex items-center gap-2 sm:hidden">
               <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
                 <Menu className="h-5 w-5" />
               </Button>
             </div>
+
             {/* Desktop Navigation */}
             <div className="hidden sm:flex items-center gap-2">
               {user ? (
@@ -1408,6 +1591,7 @@ export default function VibraApp() {
                       </div>
                     </DialogContent>
                   </Dialog>
+
                   <Dialog open={showProfile} onOpenChange={setShowProfile}>
                     <DialogTrigger asChild>
                       <Button variant="ghost" size="sm">
@@ -1537,6 +1721,7 @@ export default function VibraApp() {
                       </form>
                     </DialogContent>
                   </Dialog>
+
                   <Dialog open={showSignUp} onOpenChange={setShowSignUp}>
                     <DialogTrigger asChild>
                       <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600">
@@ -1623,6 +1808,7 @@ export default function VibraApp() {
                   </Dialog>
                 </div>
               )}
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -1639,6 +1825,7 @@ export default function VibraApp() {
             </div>
           </div>
         </div>
+
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="sm:hidden bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-4 space-y-4">
@@ -1750,6 +1937,7 @@ export default function VibraApp() {
           </div>
         )}
       </header>
+
       {/* Now Playing Bar */}
       {(currentlyPlaying || (currentPlaylist && currentPlaylist.songs.length > 0)) && (
         <div className="sticky top-[73px] z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2">
@@ -1779,6 +1967,7 @@ export default function VibraApp() {
                   </p>
                 </div>
               </div>
+
               {/* Player Controls */}
               <div className="flex-1 max-w-md">
                 <div className="flex items-center justify-center gap-2">
@@ -1841,6 +2030,7 @@ export default function VibraApp() {
                   </span>
                 </div>
               </div>
+
               {/* Additional Controls */}
               <div className="flex items-center gap-2 flex-1 justify-end">
                 <Button
@@ -1866,6 +2056,7 @@ export default function VibraApp() {
           </div>
         </div>
       )}
+
       <div className="container mx-auto px-4 py-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
@@ -1882,6 +2073,7 @@ export default function VibraApp() {
             <Heart className="h-4 w-4 text-pink-500" />
           </div>
         </div>
+
         {/* Search and Filters */}
         <div className="mb-8 space-y-4">
           <div className="relative max-w-2xl mx-auto flex gap-2">
@@ -1903,6 +2095,7 @@ export default function VibraApp() {
               {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
             </Button>
           </div>
+
           {/* Mood Filter Buttons */}
           <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
             <Button
@@ -1932,14 +2125,16 @@ export default function VibraApp() {
             ))}
           </div>
         </div>
+
         {/* Loading State */}
         {isLoading && (
           <div className="text-center py-12">
             <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
-            <p className="text-gray-600 dark:text-gray-300">Finding tracks from Saavn</p>
+            <p className="text-gray-600 dark:text-gray-300">Finding tracks from Saavn and YouTube</p>
           </div>
         )}
+
         {/* Songs Grid/List */}
         {!isLoading && (
           <div
@@ -1985,7 +2180,7 @@ export default function VibraApp() {
                             size="lg"
                             className="rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 border-2 border-white/50"
                             onClick={() => togglePlayback(song)}
-                            disabled={!song.audioUrl}
+                            disabled={!song.audioUrl && song.source !== "youtube"} // Disable if no audio URL and not YouTube
                           >
                             {currentlyPlaying === song.id ? (
                               <Pause className="h-6 w-6 text-white" />
@@ -2034,7 +2229,10 @@ export default function VibraApp() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-48">
-                              <DropdownMenuItem onClick={() => togglePlayback(song)} disabled={!song.audioUrl}>
+                              <DropdownMenuItem
+                                onClick={() => togglePlayback(song)}
+                                disabled={!song.audioUrl && song.source !== "youtube"}
+                              >
                                 <Play className="h-4 w-4 mr-2" />
                                 Play Now
                               </DropdownMenuItem>
@@ -2078,7 +2276,6 @@ export default function VibraApp() {
                                       ? `Anonymous message: "${song.messages[0].content}"`
                                       : "No anonymous messages yet."
                                   const shareText = `Check out this song on Vibra: "${song.title}" by ${song.artist}. ${messageToShare} Listen here: ${window.location.origin}`
-
                                   if (navigator.share) {
                                     navigator
                                       .share({
@@ -2134,6 +2331,7 @@ export default function VibraApp() {
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
+
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm" className="bg-transparent">
@@ -2198,6 +2396,7 @@ export default function VibraApp() {
                               </div>
                             </DialogContent>
                           </Dialog>
+
                           <Dialog
                             open={selectedSongForMessage === song.id}
                             onOpenChange={(open) => {
@@ -2334,7 +2533,7 @@ export default function VibraApp() {
                           variant="secondary"
                           className="h-8 w-8 p-0"
                           onClick={() => togglePlayback(song)}
-                          disabled={!song.audioUrl}
+                          disabled={!song.audioUrl && song.source !== "youtube"}
                         >
                           {currentlyPlaying === song.id ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                         </Button>
@@ -2356,6 +2555,7 @@ export default function VibraApp() {
             ))}
           </div>
         )}
+
         {/* No Songs Found */}
         {!isLoading && filteredSongs.length === 0 && (
           <div className="text-center py-12">
@@ -2365,6 +2565,7 @@ export default function VibraApp() {
           </div>
         )}
       </div>
+
       {/* Create Playlist Dialog */}
       <Dialog open={showCreatePlaylist} onOpenChange={setShowCreatePlaylist}>
         <DialogContent className="max-w-md">
@@ -2400,7 +2601,31 @@ export default function VibraApp() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add the YouTube Player Dialog component just before the `Toaster` component at the end of the return statement: */}
+      <Dialog open={youTubePlayerOpen} onOpenChange={setYouTubePlayerOpen}>
+        <DialogContent className="max-w-3xl w-full aspect-video p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="text-lg font-semibold line-clamp-1">{currentYouTubeSongTitle}</DialogTitle>
+            <DialogDescription>Playing from YouTube</DialogDescription>
+          </DialogHeader>
+          {currentYouTubeVideoId && (
+            <iframe
+              width="100%"
+              height="100%"
+              src={`https://www.youtube.com/embed/${currentYouTubeVideoId}?autoplay=1&rel=0`}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title={currentYouTubeSongTitle || "YouTube Video"}
+              className="flex-1"
+            ></iframe>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Toaster richColors position="top-center" />
+
       <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-2 px-4">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-1">
           <div className="flex items-center gap-2">
@@ -2438,6 +2663,7 @@ export default function VibraApp() {
           </div>
         </div>
       </footer>
+
       {showScrollToTop && (
         <Button
           variant="secondary"
