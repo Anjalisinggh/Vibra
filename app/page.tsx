@@ -357,7 +357,7 @@ const fetchSongsFromAlbum = async (albumId: string): Promise<Song[]> => {
 // Function to fetch songs from Saavn API
 const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
   try {
-    const res = await fetch(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`)
+    const res = await fetch(`https://saavn.dev/api/search/songs?query=${query}`)
     const data = await res.json()
     if (data.success && data.data && data.data.results) {
       return data.data.results.map((saavnSong: any) => {
@@ -395,61 +395,39 @@ const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
   }
 }
 
-// Function to fetch music from YouTube API
+// Remove the hardcoded API key and the fetch call to YouTube Data API.
+// This function will now generate a "song" object that, when played, will open a YouTube search embed.
+// Replace the entire `fetchYouTubeMusic` function with the following:
 const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
-  try {
-    // IMPORTANT: Replace 'YOUR_YOUTUBE_API_KEY' with your actual YouTube Data API v3 key.
-    // You can get one from the Google Cloud Console.
-    const YOUTUBE_API_KEY = "YOUR_YOUTUBE_API_KEY"
-    const YOUTUBE_API_ENDPOINT = "https://www.googleapis.com/youtube/v3/search"
+  if (!query.trim()) return []
 
-    const res = await fetch(
-      `${YOUTUBE_API_ENDPOINT}?part=snippet&q=${encodeURIComponent(
-        query,
-      )}&type=video&videoCategoryId=10&maxResults=10&key=${YOUTUBE_API_KEY}`,
-    )
-    const data = await res.json()
-    if (data.items) {
-      const youtubeSongs: Song[] = []
-      for (const item of data.items) {
-        // Filter for music videos using heuristics
-        const isMusicVideo =
-          item.id.kind === "youtube#video" &&
-          (item.snippet.channelTitle.toLowerCase().includes("vevo") ||
-            item.snippet.channelTitle.toLowerCase().includes("official artist channel") ||
-            item.snippet.title.toLowerCase().includes("official audio") ||
-            item.snippet.title.toLowerCase().includes("music video") ||
-            item.snippet.title.toLowerCase().includes("lyrics") ||
-            item.snippet.description.toLowerCase().includes("official music video"))
-        if (isMusicVideo) {
-          const artist = item.snippet.channelTitle || "Unknown Artist"
-          const moods = assignMoodToSong(item.snippet.title, artist)
-          const emotion = getPrimaryEmotion(moods)
-          youtubeSongs.push({
-            id: `youtube_${item.id.videoId}`,
-            title: item.snippet.title,
-            artist: artist,
-            primaryArtists: artist,
-            mood: moods,
-            emotion: emotion,
-            coverUrl: item.snippet.thumbnails.high.url || "/placeholder.svg?height=300&width=300",
-            audioUrl: "", // YouTube API does not provide direct audio URLs
-            previewUrl: "",
-            externalUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
-            messages: [],
-            plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder plays
-            duration: 240, // Placeholder duration, YouTube search API doesn't provide it
-            source: "youtube",
-          })
-        }
-      }
-      return youtubeSongs
-    }
-    return []
-  } catch (error) {
-    console.error("Error fetching YouTube music:", error)
-    return []
-  }
+  const title = query // Use query as title for simplicity
+  const artist = "Various Artists" // Placeholder artist for search results
+  const moods = assignMoodToSong(title, artist)
+  const emotion = getPrimaryEmotion(moods)
+
+  // Construct the YouTube search embed URL
+  const youtubeSearchEmbedUrl = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`
+
+  // Return a single "song" representing the YouTube search result
+  return [
+    {
+      id: `youtube_search_${btoa(query).replace(/=/g, "")}`, // Base64 encode query for unique ID
+      title: `YouTube Search: ${title}`,
+      artist: artist,
+      primaryArtists: artist,
+      mood: moods,
+      emotion: emotion,
+      coverUrl: "/placeholder.svg?height=300&width=300", // Placeholder cover
+      audioUrl: "", // No direct audio URL
+      previewUrl: "",
+      externalUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, // Link to actual YouTube search
+      messages: [],
+      plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder plays
+      duration: 240, // Placeholder duration
+      source: "youtube",
+    },
+  ]
 }
 
 // Function to fetch a song by ID
@@ -494,17 +472,34 @@ const fetchSongById = async (
     } catch (error) {
       console.error("Error fetching Saavn song by ID:", error)
     }
-  } else if (id.startsWith("youtube_")) {
-    // For YouTube songs, we don't have a direct "get by ID" endpoint for full details
-    // We can try to reconstruct it if needed, but for now, assume it's in `allMessages`
-    const youtubeId = id.replace("youtube_", "")
-    // This is a simplified reconstruction, as the nocodeapi doesn't have a direct song endpoint
-    // In a real app, you'd need to store more metadata or use a different YouTube API endpoint
-    const messageForSong = allMessages.find((msg) => msg.songId === id)
-    if (messageForSong) {
-      // Try to find the song in the current songs array
-      const existingSong = songs.find((s) => s.id === id)
-      if (existingSong) return existingSong
+  } else if (id.startsWith("youtube_search_")) {
+    try {
+      const encodedQuery = id.replace("youtube_search_", "")
+      const query = atob(encodedQuery) // Decode the query
+
+      const title = query
+      const artist = "Various Artists"
+      const moods = assignMoodToSong(title, artist)
+      const emotion = getPrimaryEmotion(moods)
+
+      return {
+        id: id,
+        title: `YouTube Search: ${title}`,
+        artist: artist,
+        primaryArtists: artist,
+        mood: moods,
+        emotion: emotion,
+        coverUrl: "/placeholder.svg?height=300&width=300",
+        audioUrl: "",
+        previewUrl: "",
+        externalUrl: `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`,
+        messages: [],
+        plays: Math.floor(Math.random() * 1000000) + 10000,
+        duration: 240,
+        source: "youtube",
+      }
+    } catch (error) {
+      console.error("Error reconstructing YouTube search song by ID:", error)
     }
   }
   return null
@@ -594,6 +589,7 @@ const getFallbackSongs = (query: string): Song[] => {
       source: "youtube" as const,
     },
   ]
+
   // Filter fallback songs based on query if provided
   if (query && query.trim()) {
     const lowerQuery = query.toLowerCase()
@@ -663,6 +659,7 @@ export default function VibraApp() {
   const [youTubePlayerOpen, setYouTubePlayerOpen] = useState(false)
   const [currentYouTubeVideoId, setCurrentYouTubeVideoId] = useState<string | null>(null)
   const [currentYouTubeSongTitle, setCurrentYouTubeSongTitle] = useState<string | null>(null)
+
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [searchQuery, setSearchQuery] = useState("")
@@ -1053,6 +1050,7 @@ export default function VibraApp() {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
       if (!playlist) return
+
       const updatedSongs = playlist.songs.filter((s) => s.id !== songId)
       if (playlist.firebaseId) {
         await updateDoc(doc(db, "playlists", playlist.firebaseId), {
@@ -1071,6 +1069,7 @@ export default function VibraApp() {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
       if (!playlist || !playlist.firebaseId) return
+
       await deleteDoc(doc(db, "playlists", playlist.firebaseId))
       setPlaylists((prev) => prev.filter((p) => p.id !== playlistId))
       toast.success(`Playlist "${playlist.name}" deleted`)
@@ -1088,7 +1087,9 @@ export default function VibraApp() {
       toast.info("Please sign in to share your message")
       return
     }
+
     if (!newMessage.trim()) return
+
     try {
       const emotion = analyzeSentiment(newMessage)
       const messageData = {
@@ -1270,7 +1271,6 @@ export default function VibraApp() {
         return
       }
     }
-
     if (currentPlaylist) {
       // Only update currentSongIndex if it's a playlist
       setCurrentSongIndex(nextIndex)
@@ -1300,7 +1300,6 @@ export default function VibraApp() {
         return
       }
     }
-
     if (currentPlaylist) {
       // Only update currentSongIndex if it's a playlist
       setCurrentSongIndex(prevIndex)
@@ -1380,13 +1379,14 @@ export default function VibraApp() {
           audio.removeEventListener("timeupdate", updateProgress)
           handleSongEnd()
         }
-      } else if (song.source === "youtube" && song.id.startsWith("youtube_")) {
-        const videoId = song.id.replace("youtube_", "")
-        setCurrentYouTubeVideoId(videoId)
-        setCurrentYouTubeSongTitle(`${song.title} - ${song.artist}`)
+      } else if (song.source === "youtube") {
+        // For YouTube search embeds, the "video ID" is actually the search query embedded in the song title
+        const searchQueryForEmbed = song.title.replace("YouTube Search: ", "")
+        setCurrentYouTubeVideoId(searchQueryForEmbed)
+        setCurrentYouTubeSongTitle(song.title)
         setYouTubePlayerOpen(true)
         setCurrentlyPlaying(song.id) // Mark as currently playing
-        toast.info(`Playing YouTube: ${song.title}`)
+        toast.info(`Playing YouTube Search: ${song.title}`)
         // For YouTube, progress is not tracked via HTMLAudioElement, so reset/hide progress bar
         setCurrentTime(0)
         setPlaybackProgress(0)
@@ -1397,6 +1397,7 @@ export default function VibraApp() {
       } else {
         toast.error("No playable source available for this song.")
       }
+
       // Clear playlist context if playing individual song
       if (!currentPlaylist || !currentPlaylist.songs.some((s) => s.id === song.id)) {
         setCurrentPlaylist(null)
@@ -2131,7 +2132,7 @@ export default function VibraApp() {
           <div className="text-center py-12">
             <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
-            <p className="text-gray-600 dark:text-gray-300">Finding tracks from Saavn and YouTube</p>
+            <p className="text-gray-600 dark:text-gray-300">Finding tracks </p>
           </div>
         )}
 
@@ -2613,7 +2614,7 @@ export default function VibraApp() {
             <iframe
               width="100%"
               height="100%"
-              src={`https://www.youtube.com/embed/${currentYouTubeVideoId}?autoplay=1&rel=0`}
+              src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(currentYouTubeVideoId)}&autoplay=1&rel=0`}
               frameBorder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
