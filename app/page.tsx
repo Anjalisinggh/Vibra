@@ -81,6 +81,8 @@ import { auth, db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 import { Toaster } from "@/components/ui/sonner"
 import { useDebounce } from "@/hooks/use-debounce"
+// Add the Link import
+import Link from "next/link"
 
 interface Song {
   id: string
@@ -143,6 +145,7 @@ const moodColors = {
   motivational: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
   edgy: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300",
 }
+
 // Mood-based search queries
 const moodQueries = {
   joy: ["happy songs", "upbeat music", "feel good songs", "celebration", "cheerful music"],
@@ -166,11 +169,13 @@ const moodQueries = {
   peaceful: ["peaceful music", "serene songs", "tranquil", "harmony", "zen"],
   motivational: ["motivational songs", "inspiration", "never give up", "determination", "drive"],
 }
+
 interface AppUser {
   id: string
   name: string
   email: string
 }
+
 interface SaavnAlbum {
   id: string
   name: string
@@ -178,6 +183,7 @@ interface SaavnAlbum {
   url: string
   songCount: number
 }
+
 // Function to fetch albums from Saavn API
 const fetchSaavnAlbums = async (query: string): Promise<SaavnAlbum[]> => {
   try {
@@ -198,12 +204,14 @@ const fetchSaavnAlbums = async (query: string): Promise<SaavnAlbum[]> => {
     return []
   }
 }
+
 // Function to assign mood based on song title and artist
 const assignMoodToSong = (title: string, artist: string): string[] => {
   const lowerTitle = title.toLowerCase()
   const lowerArtist = artist.toLowerCase()
   const text = `${lowerTitle} ${lowerArtist}`
   const moods: string[] = []
+
   if (text.includes("love") || text.includes("heart") || text.includes("romantic") || text.includes("kiss")) {
     moods.push("love", "romantic")
   }
@@ -265,6 +273,7 @@ const assignMoodToSong = (title: string, artist: string): string[] => {
   if (text.includes("alone") || text.includes("lonely") || text.includes("empty") || text.includes("miss")) {
     moods.push("lonely", "melancholy")
   }
+
   // Genre-based mood assignment
   if (text.includes("blues")) moods.push("melancholy", "contemplative")
   if (text.includes("jazz")) moods.push("contemplative", "peaceful")
@@ -273,6 +282,7 @@ const assignMoodToSong = (title: string, artist: string): string[] => {
   if (text.includes("folk")) moods.push("contemplative", "nostalgia")
   if (text.includes("pop")) moods.push("upbeat", "joy")
   if (text.includes("rap") || text.includes("hip hop")) moods.push("energetic", "empowerment")
+
   // Default moods if none detected
   if (moods.length === 0) {
     if (text.includes("slow") || text.includes("ballad")) {
@@ -283,8 +293,10 @@ const assignMoodToSong = (title: string, artist: string): string[] => {
       moods.push("contemplative", "peaceful")
     }
   }
+
   return [...new Set(moods)] // Remove duplicates
 }
+
 // Function to get primary emotion from moods
 const getPrimaryEmotion = (moods: string[]): string => {
   const emotionPriority = [
@@ -302,6 +314,7 @@ const getPrimaryEmotion = (moods: string[]): string => {
   }
   return moods[0] || "contemplative"
 }
+
 // Function to fetch songs from a specific Saavn album
 const fetchSongsFromAlbum = async (albumId: string): Promise<Song[]> => {
   try {
@@ -343,6 +356,7 @@ const fetchSongsFromAlbum = async (albumId: string): Promise<Song[]> => {
     return []
   }
 }
+
 // Function to fetch songs from Saavn API
 const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
   try {
@@ -383,6 +397,7 @@ const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
     return []
   }
 }
+
 // Function to fetch YouTube music using the YouTube Data API
 const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
   if (!query.trim()) return []
@@ -429,11 +444,12 @@ const fetchYouTubeMusic = async (query: string): Promise<Song[]> => {
     return []
   }
 }
+
 // Function to fetch a song by ID
 const fetchSongById = async (
   id: string,
-  allMessages: AnonymousMessage[] = [],
-  songs: Song[] = [],
+  allMessages: AnonymousMessage[] = [], // Ensure this parameter is used
+  songs: Song[] = [], // This parameter is not directly used for message population, but kept for consistency
 ): Promise<Song | null> => {
   if (id.startsWith("saavn_")) {
     try {
@@ -462,7 +478,7 @@ const fetchSongById = async (
             "",
           previewUrl: "",
           externalUrl: saavnSong.url || "",
-          messages: [], // No messages available in this scope
+          messages: allMessages.filter((msg) => msg.songId === `saavn_${saavnSong.id}`), // Populate messages here
           plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
           duration: saavnSong.duration || 180,
           source: "saavn",
@@ -500,7 +516,7 @@ const fetchSongById = async (
           audioUrl: `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`, // Direct embed URL
           previewUrl: "",
           externalUrl: `https://www.youtube.com/watch?v=${videoId}`,
-          messages: [],
+          messages: allMessages.filter((msg) => msg.songId === id), // Populate messages here
           plays: Math.floor(Math.random() * 1000000) + 10000, // Placeholder
           duration: 240, // Placeholder
           source: "youtube",
@@ -512,6 +528,7 @@ const fetchSongById = async (
   }
   return null
 }
+
 // Fallback songs when APIs fail
 const getFallbackSongs = (query: string): Song[] => {
   const fallbackTracks = [
@@ -608,6 +625,7 @@ const getFallbackSongs = (query: string): Song[] => {
   }
   return fallbackTracks
 }
+
 // Load initial songs from Saavn and YouTube APIs
 const loadInitialSongs = async (): Promise<Song[]> => {
   try {
@@ -629,16 +647,21 @@ const loadInitialSongs = async (): Promise<Song[]> => {
       "lofi hip hop",
       "relaxing music",
     ]
+
     const saavnPromises = saavnQueries.map((query) => fetchSaavnSongs(query))
     const youtubePromises = youtubeQueries.map((query) => fetchYouTubeMusic(query))
+
     const [saavnResults, youtubeResults] = await Promise.all([Promise.all(saavnPromises), Promise.all(youtubePromises)])
+
     const allSongs: Song[] = []
     saavnResults.forEach((songs) => allSongs.push(...songs))
     youtubeResults.forEach((songs) => allSongs.push(...songs))
+
     // If no songs were fetched, use fallback
     if (allSongs.length === 0) {
       allSongs.push(...getFallbackSongs(""))
     }
+
     // Remove duplicates and shuffle
     const uniqueSongs = allSongs
       .filter(
@@ -646,12 +669,14 @@ const loadInitialSongs = async (): Promise<Song[]> => {
       )
       .sort(() => Math.random() - 0.5)
       .slice(0, 150) // Increased limit for more songs
+
     return uniqueSongs
   } catch (error) {
     console.error("Error loading initial songs:", error)
     return getFallbackSongs("")
   }
 }
+
 export default function VibraApp() {
   // Add new state variables at the top of the `VibraApp` component, alongside other `useState` declarations:
   const [youTubePlayerOpen, setYouTubePlayerOpen] = useState(false)
@@ -698,9 +723,11 @@ export default function VibraApp() {
   const progressInterval = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
   const [showScrollToTop, setShowScrollToTop] = useState(false) // New state for scroll to top button
+
   // New: Ref for the header to measure its height
   const headerRef = useRef<HTMLElement>(null)
   const [headerHeight, setHeaderHeight] = useState(0)
+
   // Effect to measure header height
   useEffect(() => {
     const updateHeaderHeight = () => {
@@ -720,6 +747,7 @@ export default function VibraApp() {
       observer.disconnect()
     }
   }, [mobileMenuOpen]) // Re-run when mobile menu opens/closes
+
   // Toggle dark mode
   useEffect(() => {
     if (isDarkMode) {
@@ -728,6 +756,7 @@ export default function VibraApp() {
       document.documentElement.classList.remove("dark")
     }
   }, [isDarkMode])
+
   // Firebase Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -746,12 +775,14 @@ export default function VibraApp() {
     })
     return () => unsubscribe()
   }, [])
+
   // Combined data loading function
   const loadInitialData = async () => {
     setIsLoading(true)
     try {
       // 1. First load songs
       const initialSongs = await loadInitialSongs()
+
       // 2. Then load messages
       const messagesRef = collection(db, "messages")
       const q = query(messagesRef, orderBy("timestamp", "desc"))
@@ -769,6 +800,7 @@ export default function VibraApp() {
           likedBy: data.likedBy || [],
         })
       })
+
       // 3. Associate messages with songs before setting state
       const songsWithMessages = initialSongs.map((song) => ({
         ...song,
@@ -776,6 +808,7 @@ export default function VibraApp() {
       }))
       setSongs(songsWithMessages)
       setAllMessages(initialMessages)
+
       // 4. Set up real-time listener
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const updatedMessages: AnonymousMessage[] = []
@@ -810,6 +843,7 @@ export default function VibraApp() {
       setIsLoading(false)
     }
   }
+
   // Load initial data on component mount
   useEffect(() => {
     const unsubscribePromise = loadInitialData()
@@ -819,6 +853,7 @@ export default function VibraApp() {
       })
     }
   }, [])
+
   // Scroll to top button visibility
   useEffect(() => {
     const handleScroll = () => {
@@ -833,6 +868,7 @@ export default function VibraApp() {
       window.removeEventListener("scroll", handleScroll)
     }
   }, [])
+
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
@@ -856,7 +892,9 @@ export default function VibraApp() {
       const albumResults = await fetchSaavnAlbums(queryToSearch)
       const albumSongPromises = albumResults.map((album) => fetchSongsFromAlbum(album.id))
       const songsFromAlbums = (await Promise.all(albumSongPromises)).flat()
+
       const combinedResults: Song[] = [...saavnResults, ...youtubeResults, ...songsFromAlbums]
+
       // Also search messages (this part remains the same)
       const messagesSnapshot = await getDocs(
         query(
@@ -865,14 +903,24 @@ export default function VibraApp() {
           where("content", "<=", queryToSearch + "\uf8ff"),
         ),
       )
-      const songIds = [...new Set(messagesSnapshot.docs.map((d) => d.data().songId))]
-      const songPromises = songIds.map((id) => fetchSongById(id, allMessages, songs))
+      const songIdsFromMessages = [...new Set(messagesSnapshot.docs.map((d) => d.data().songId))]
+      const songPromises = songIdsFromMessages.map((id) => fetchSongById(id, allMessages, songs))
       const newSongs = (await Promise.all(songPromises)).filter(Boolean)
-      // Combine all results and deduplicate
+
+      // Combine all results
       combinedResults.push(...(newSongs as Song[]))
-      const uniqueSongs = combinedResults.filter(
+
+      // Populate messages for all combined songs using the current allMessages state
+      const songsWithPopulatedMessages = combinedResults.map((song) => ({
+        ...song,
+        messages: allMessages.filter((msg) => msg.songId === song.id),
+      }))
+
+      // Deduplicate
+      const uniqueSongs = songsWithPopulatedMessages.filter(
         (song, index, self) => song && index === self.findIndex((s) => s && s.id === song.id),
       )
+
       setSongs(uniqueSongs.length > 0 ? uniqueSongs : getFallbackSongs(queryToSearch))
     } catch (error) {
       console.error("Error searching songs:", error)
@@ -885,7 +933,7 @@ export default function VibraApp() {
   // Effect to trigger search on debounced query change
   useEffect(() => {
     performSearch(debouncedSearchQuery)
-  }, [debouncedSearchQuery])
+  }, [debouncedSearchQuery]) // Added allMessages to dependency array to re-run search when messages update
 
   // Filter by mood from Saavn and YouTube APIs
   const handleMoodFilter = async (mood: string) => {
@@ -904,11 +952,19 @@ export default function VibraApp() {
       }
       const resultsArrays = await Promise.all(allPromises)
       const allSongs: Song[] = resultsArrays.flat()
-      if (allSongs.length === 0) {
+
+      // Populate messages for mood-filtered songs
+      const songsWithPopulatedMessages = allSongs.map((song) => ({
+        ...song,
+        messages: allMessages.filter((msg) => msg.songId === song.id),
+      }))
+
+      if (songsWithPopulatedMessages.length === 0) {
         const fallbackSongs = getFallbackSongs("").filter((song) => song.mood.includes(mood))
-        allSongs.push(...fallbackSongs)
+        songsWithPopulatedMessages.push(...fallbackSongs)
       }
-      const uniqueSongs = allSongs.filter(
+
+      const uniqueSongs = songsWithPopulatedMessages.filter(
         (song, index, self) => index === self.findIndex((s) => s.title === song.title && s.artist === song.artist),
       )
       setSongs(uniqueSongs)
@@ -920,6 +976,7 @@ export default function VibraApp() {
       setIsLoading(false)
     }
   }
+
   // Firebase Authentication functions
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -945,6 +1002,7 @@ export default function VibraApp() {
       setAuthLoading(false)
     }
   }
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!signInData.email || !signInData.password) {
@@ -964,6 +1022,7 @@ export default function VibraApp() {
       setAuthLoading(false)
     }
   }
+
   const handleSignOut = async () => {
     try {
       await signOut(auth)
@@ -981,6 +1040,7 @@ export default function VibraApp() {
       console.error("Error signing out:", error)
     }
   }
+
   // Firebase Firestore functions
   const loadUserPlaylists = async (userId: string) => {
     try {
@@ -1000,6 +1060,7 @@ export default function VibraApp() {
       console.error("Error loading playlists:", error)
     }
   }
+
   const createPlaylist = async () => {
     if (!newPlaylistName.trim() || !user) return
     try {
@@ -1027,6 +1088,7 @@ export default function VibraApp() {
       toast.error("Failed to create playlist")
     }
   }
+
   const addToPlaylist = async (song: Song, playlistId: string) => {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
@@ -1049,6 +1111,7 @@ export default function VibraApp() {
       toast.error("Failed to add song to playlist")
     }
   }
+
   const removeFromPlaylist = async (songId: string, playlistId: string) => {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
@@ -1066,6 +1129,7 @@ export default function VibraApp() {
       toast.error("Failed to remove song from playlist")
     }
   }
+
   const deletePlaylist = async (playlistId: string) => {
     try {
       const playlist = playlists.find((p) => p.id === playlistId)
@@ -1078,6 +1142,7 @@ export default function VibraApp() {
       toast.error("Failed to delete playlist")
     }
   }
+
   const addAnonymousMessage = async (songId: string) => {
     // Check if user is logged in
     if (!firebaseUser) {
@@ -1098,14 +1163,9 @@ export default function VibraApp() {
         likedBy: [],
       }
       await addDoc(collection(db, "messages"), messageData)
-      // Check if song exists in current state
-      const songExists = songs.some((s) => s.id === songId)
-      if (!songExists) {
-        const newSong = await fetchSongById(songId, allMessages, songs)
-        if (newSong) {
-          setSongs((prev) => [...prev, newSong])
-        }
-      }
+
+      // The onSnapshot listener in loadInitialData will automatically update allMessages and songs.
+      // No need to manually fetch and add the song here.
       setMessageSuccess(true)
       setNewMessage("")
       toast.success("Your anonymous message has been shared")
@@ -1118,6 +1178,7 @@ export default function VibraApp() {
       toast.error("Failed to send message. Please try again.")
     }
   }
+
   const likeMessage = async (messageId: string) => {
     if (!firebaseUser) {
       setShowSignIn(true)
@@ -1128,11 +1189,13 @@ export default function VibraApp() {
       const messageRef = doc(db, "messages", messageId)
       const message = allMessages.find((m) => m.id === messageId)
       if (!message) return
+
       // Check if user already liked this message
       if (message.likedBy.includes(firebaseUser.uid)) {
         toast.info("You've already liked this message")
         return
       }
+
       await updateDoc(messageRef, {
         likes: increment(1),
         likedBy: arrayUnion(firebaseUser.uid),
@@ -1143,6 +1206,7 @@ export default function VibraApp() {
       toast.error("Failed to like message")
     }
   }
+
   // Playlist playback functions
   const playPlaylist = (playlist: Playlist) => {
     if (playlist.songs.length === 0) return
@@ -1153,6 +1217,7 @@ export default function VibraApp() {
     togglePlayback(firstSong)
     setShowPlaylists(false) // Close the playlist dialog after playing
   }
+
   const playSpecificSong = (song: Song) => {
     // This helper is now primarily used by handleSongEnd for repeatMode === "one"
     // It assumes an audio song. For general playback, use togglePlayback.
@@ -1164,12 +1229,15 @@ export default function VibraApp() {
       clearInterval(progressInterval.current)
       progressInterval.current = null
     }
+
     if (song.audioUrl && song.source === "saavn") {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
+
       // Set initial progress
       setCurrentTime(0)
       setPlaybackProgress(0)
+
       // Update progress while playing
       const updateProgress = () => {
         if (audio.duration) {
@@ -1180,6 +1248,7 @@ export default function VibraApp() {
       }
       progressInterval.current = setInterval(updateProgress, 1000)
       audio.addEventListener("timeupdate", updateProgress)
+
       audio
         .play()
         .then(() => {
@@ -1198,6 +1267,7 @@ export default function VibraApp() {
           toast.error("Failed to play audio")
           setCurrentlyPlaying(null)
         })
+
       audio.onended = () => {
         if (progressInterval.current) {
           clearInterval(progressInterval.current)
@@ -1211,6 +1281,7 @@ export default function VibraApp() {
       setCurrentlyPlaying(null)
     }
   }
+
   const handleSongEnd = () => {
     // This function is only called by HTMLAudioElement.onended, so it only applies to Saavn songs.
     const activeSong = songs.find((s) => s.id === currentlyPlaying) || currentPlaylist?.songs[currentSongIndex]
@@ -1220,6 +1291,7 @@ export default function VibraApp() {
       setCurrentAudio(null)
       return
     }
+
     if (repeatMode === "one") {
       playSpecificSong(activeSong) // Replay the same song
     } else if (currentPlaylist && currentPlaylist.songs.length > 0) {
@@ -1245,13 +1317,16 @@ export default function VibraApp() {
       setCurrentAudio(null)
     }
   }
+
   const playNext = () => {
     const currentQueue = currentPlaylist ? currentPlaylist.songs : filteredSongs
     const currentIndex = currentQueue.findIndex((s) => s.id === currentlyPlaying)
+
     if (currentIndex === -1 || currentQueue.length === 0) {
       // If no song is currently playing or queue is empty, do nothing
       return
     }
+
     let nextIndex = currentIndex + 1
     if (nextIndex >= currentQueue.length) {
       if (repeatMode === "all") {
@@ -1267,24 +1342,29 @@ export default function VibraApp() {
         return
       }
     }
+
     const nextSong = currentQueue[nextIndex]
     if (currentPlaylist) {
       setCurrentSongIndex(nextIndex) // Update index for playlist
     }
     togglePlayback(nextSong)
   }
+
   const playPrevious = () => {
     const currentQueue = currentPlaylist ? currentPlaylist.songs : filteredSongs
     const currentIndex = currentQueue.findIndex((s) => s.id === currentlyPlaying)
+
     if (currentIndex === -1 || currentQueue.length === 0) {
       return
     }
+
     // If more than 3 seconds into the song, restart it (only for audio)
     const activeSong = currentQueue[currentIndex]
     if (activeSong.source === "saavn" && currentAudio && currentAudio.currentTime > 3) {
       currentAudio.currentTime = 0
       return
     }
+
     let prevIndex = currentIndex - 1
     if (prevIndex < 0) {
       if (repeatMode === "all") {
@@ -1300,12 +1380,14 @@ export default function VibraApp() {
         return
       }
     }
+
     const prevSong = currentQueue[prevIndex]
     if (currentPlaylist) {
       setCurrentSongIndex(prevIndex) // Update index for playlist
     }
     togglePlayback(prevSong)
   }
+
   const toggleRepeat = () => {
     const modes: ("none" | "one" | "all")[] = ["none", "one", "all"]
     const currentIndex = modes.indexOf(repeatMode)
@@ -1313,6 +1395,7 @@ export default function VibraApp() {
     setRepeatMode(modes[nextIndex])
     toast.success(`Repeat mode: ${modes[nextIndex]}`)
   }
+
   // Unified togglePlayback function to handle both Saavn audio and YouTube embeds
   const togglePlayback = (song: Song) => {
     // Always clear existing audio playback
@@ -1324,25 +1407,30 @@ export default function VibraApp() {
       clearInterval(progressInterval.current)
       progressInterval.current = null
     }
+
     // Always close YouTube player if a new song is selected or the same YouTube song is clicked to stop
     if (youTubePlayerOpen) {
       setYouTubePlayerOpen(false)
       setCurrentYouTubeVideoId(null)
       setCurrentYouTubeSongTitle(null)
     }
+
     // If the same song is clicked, and it was playing, stop it.
     if (currentlyPlaying === song.id) {
       setCurrentlyPlaying(null)
       toast.info(`Stopped: ${song.title}`)
       return // Stop playback
     }
+
     // Set the new song as currently playing
     setCurrentlyPlaying(song.id)
+
     if (song.source === "saavn" && song.audioUrl) {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
       setCurrentTime(0)
       setPlaybackProgress(0)
+
       const updateProgress = () => {
         if (audio.duration) {
           const progress = (audio.currentTime / audio.duration) * 100
@@ -1352,6 +1440,7 @@ export default function VibraApp() {
       }
       progressInterval.current = setInterval(updateProgress, 1000)
       audio.addEventListener("timeupdate", updateProgress)
+
       audio
         .play()
         .then(() => {
@@ -1369,6 +1458,7 @@ export default function VibraApp() {
           toast.error("Failed to play audio")
           setCurrentlyPlaying(null) // Clear playing state on error
         })
+
       audio.onended = () => {
         if (progressInterval.current) {
           clearInterval(progressInterval.current)
@@ -1402,10 +1492,12 @@ export default function VibraApp() {
       toast.error("No playable source available for this song.")
       setCurrentlyPlaying(null) // Clear playing state if no source
     }
+
     if (currentPlaylist && !currentPlaylist.songs.some((s) => s.id === song.id)) {
       setCurrentPlaylist(null)
     }
   }
+
   // Open external link
   const openExternalLink = (url: string) => {
     if (url) {
@@ -1414,19 +1506,24 @@ export default function VibraApp() {
       toast.error("No external URL available for this song")
     }
   }
+
   // Sentiment analysis function
   const analyzeSentiment = (text: string): string => {
     const sadWords = ["sad", "hurt", "pain", "miss", "lonely", "cry", "broken", "lost", "empty", "depressed"]
     const happyWords = ["happy", "joy", "love", "excited", "amazing", "wonderful", "great", "awesome", "fantastic"]
     const anxiousWords = ["worried", "stress", "scared", "nervous", "anxious", "fear", "panic", "overwhelmed"]
     const angryWords = ["angry", "mad", "furious", "hate", "rage", "annoyed", "frustrated", "pissed"]
+
     const lowerText = text.toLowerCase()
+
     if (sadWords.some((word) => lowerText.includes(word))) return "melancholy"
     if (happyWords.some((word) => lowerText.includes(word))) return "joy"
     if (anxiousWords.some((word) => lowerText.includes(word))) return "anxiety"
     if (angryWords.some((word) => lowerText.includes(word))) return "empowerment"
+
     return "contemplative"
   }
+
   // Filter songs based on search and mood
   const filteredSongs = songs.filter((song) => {
     const lowerQuery = searchQuery.toLowerCase()
@@ -1437,14 +1534,17 @@ export default function VibraApp() {
     const matchesMood = !selectedMood || song.mood.includes(selectedMood)
     return matchesSearch && matchesMood
   })
+
   // Format duration
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
+
   // Get mood filter buttons
   const moodFilters = [{ key: "love", label: "Love & Romance", icon: "💕" }]
+
   return (
     <div
       className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "dark bg-gray-900" : "bg-gray-50"}`}
@@ -1459,9 +1559,11 @@ export default function VibraApp() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <Headphones className="h-8 w-8 text-purple-600" />
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  Vibra
-                </h1>
+                <Link href="/">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                    Vibra
+                  </h1>
+                </Link>
               </div>
               <p className="hidden md:block text-sm text-gray-600 dark:text-gray-300 italic">
                 Feel the music, speak the unspoken.
