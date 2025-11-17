@@ -84,6 +84,8 @@ import { useDebounce } from "@/hooks/use-debounce"
 // Add the Link import
 import Link from "next/link"
 
+const AUDIUS_APP_NAME = process.env.NEXT_PUBLIC_AUDIUS_APP_NAME || "vibra-unspoken"
+
 interface Song {
   id: string
   title: string
@@ -97,7 +99,7 @@ interface Song {
   messages: AnonymousMessage[]
   plays: number
   duration: number
-  source: "saavn" | "youtube"
+  source: "saavn" | "youtube" | "audius"
   primaryArtists?: string
 }
 
@@ -315,6 +317,49 @@ const getPrimaryEmotion = (moods: string[]): string => {
   return moods[0] || "contemplative"
 }
 
+const mapAudiusTrackToSong = (track: any, messages: AnonymousMessage[] = []): Song => {
+  if (!track || !track.id) {
+    throw new Error("Invalid Audius track data")
+  }
+
+  const title = track.title || "Untitled Track"
+  const artist = track.user?.name || track.user?.handle || "Unknown Artist"
+  const moods = assignMoodToSong(title, artist)
+  const emotion = getPrimaryEmotion(moods)
+  const artwork = track.artwork || {}
+  const coverUrl =
+    artwork["1000x1000"] ||
+    artwork["640x0"] ||
+    artwork["480x480"] ||
+    artwork["150x150"] ||
+    "/placeholder.svg?height=300&width=300"
+
+  const baseStreamUrl =
+    track.stream_url || (track.id ? `https://api.audius.co/v1/tracks/${track.id}/stream` : "")
+  const audioUrl = baseStreamUrl
+    ? baseStreamUrl.includes("app_name=")
+      ? baseStreamUrl
+      : `${baseStreamUrl}${baseStreamUrl.includes("?") ? "&" : "?"}app_name=${encodeURIComponent(AUDIUS_APP_NAME)}`
+    : ""
+
+  return {
+    id: `audius_${track.id}`,
+    title,
+    artist,
+    primaryArtists: artist,
+    mood: moods,
+    emotion,
+    coverUrl,
+    audioUrl,
+    previewUrl: "",
+    externalUrl: track.permalink || track.permalink_url || "",
+    messages,
+    plays: track.play_count || Math.floor(Math.random() * 50000) + 5000,
+    duration: track.duration || 0,
+    source: "audius",
+  }
+}
+
 // Function to fetch songs from a specific Saavn album
 const fetchSongsFromAlbum = async (albumId: string): Promise<Song[]> => {
   try {
@@ -357,43 +402,28 @@ const fetchSongsFromAlbum = async (albumId: string): Promise<Song[]> => {
   }
 }
 
-// Function to fetch songs from Saavn API
-const fetchSaavnSongs = async (query: string): Promise<Song[]> => {
+// Function to fetch songs from Audius API
+const fetchAudiusTracks = async (query: string): Promise<Song[]> => {
+  const trimmedQuery = query.trim()
+  if (!trimmedQuery) return []
+
   try {
-    const res = await fetch(`https://saavn.dev/api/search/songs?query=${query}`)
+    const res = await fetch(
+      `https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(trimmedQuery)}&app_name=${encodeURIComponent(
+        AUDIUS_APP_NAME,
+      )}`,
+    )
+    if (!res.ok) {
+      console.error(`Audius search failed with status ${res.status}`)
+      return []
+    }
     const data = await res.json()
-    if (data.success && data.data && data.data.results) {
-      return data.data.results.map((saavnSong: any) => {
-        const artist = saavnSong.artists?.primary?.map((a: any) => a.name).join(", ") || "Unknown Artist"
-        const moods = assignMoodToSong(saavnSong.name, artist)
-        const emotion = getPrimaryEmotion(moods)
-        return {
-          id: `saavn_${saavnSong.id}`,
-          title: saavnSong.name,
-          artist: artist,
-          primaryArtists: artist,
-          mood: moods,
-          emotion: emotion,
-          coverUrl:
-            saavnSong.image?.find((img: any) => img.quality === "500x500")?.url ||
-            saavnSong.image?.[saavnSong.image.length - 1]?.url ||
-            "/placeholder.svg?height=300&width=300",
-          audioUrl:
-            saavnSong.downloadUrl?.find((url: any) => url.quality === "320kbps")?.url ||
-            saavnSong.downloadUrl?.[saavnSong.downloadUrl.length - 1]?.url ||
-            "",
-          previewUrl: "",
-          externalUrl: saavnSong.url || "",
-          messages: [], // Will be populated later
-          plays: saavnSong.playCount || Math.floor(Math.random() * 50000) + 5000,
-          duration: saavnSong.duration || 180,
-          source: "saavn",
-        }
-      })
+    if (Array.isArray(data?.data)) {
+      return data.data.filter((track: any) => track && track.id).map((track: any) => mapAudiusTrackToSong(track))
     }
     return []
   } catch (error) {
-    console.error("Error fetching Saavn songs:", error)
+    console.error("Error fetching Audius tracks:", error)
     return []
   }
 }
@@ -486,6 +516,25 @@ const fetchSongById = async (
       }
     } catch (error) {
       console.error("Error fetching Saavn song by ID:", error)
+    }
+  } else if (id.startsWith("audius_")) {
+    try {
+      const audiusId = id.replace("audius_", "")
+      const res = await fetch(
+        `https://api.audius.co/v1/tracks/${audiusId}?app_name=${encodeURIComponent(AUDIUS_APP_NAME)}`,
+      )
+      if (!res.ok) {
+        console.error(`Audius track lookup failed with status ${res.status}`)
+        return null
+      }
+      const data = await res.json()
+      const track = data?.data
+      if (track) {
+        const messagesForSong = allMessages.filter((msg) => msg.songId === id)
+        return mapAudiusTrackToSong(track, messagesForSong)
+      }
+    } catch (error) {
+      console.error("Error fetching Audius song by ID:", error)
     }
   } else if (id.startsWith("youtube_")) {
     try {
@@ -626,10 +675,10 @@ const getFallbackSongs = (query: string): Song[] => {
   return fallbackTracks
 }
 
-// Load initial songs from Saavn and YouTube APIs
+// Load initial songs from Audius and YouTube APIs
 const loadInitialSongs = async (): Promise<Song[]> => {
   try {
-    const saavnQueries = [
+    const audiusQueries = [
       "bollywood hits",
       "arijit singh",
       "hindi songs",
@@ -648,13 +697,16 @@ const loadInitialSongs = async (): Promise<Song[]> => {
       "relaxing music",
     ]
 
-    const saavnPromises = saavnQueries.map((query) => fetchSaavnSongs(query))
+    const audiusPromises = audiusQueries.map((query) => fetchAudiusTracks(query))
     const youtubePromises = youtubeQueries.map((query) => fetchYouTubeMusic(query))
 
-    const [saavnResults, youtubeResults] = await Promise.all([Promise.all(saavnPromises), Promise.all(youtubePromises)])
+    const [audiusResults, youtubeResults] = await Promise.all([
+      Promise.all(audiusPromises),
+      Promise.all(youtubePromises),
+    ])
 
     const allSongs: Song[] = []
-    saavnResults.forEach((songs) => allSongs.push(...songs))
+    audiusResults.forEach((songs) => allSongs.push(...songs))
     youtubeResults.forEach((songs) => allSongs.push(...songs))
 
     // If no songs were fetched, use fallback
@@ -884,8 +936,8 @@ export default function VibraApp() {
     }
     setIsLoading(true)
     try {
-      const [saavnResults, youtubeResults] = await Promise.all([
-        fetchSaavnSongs(queryToSearch),
+      const [audiusResults, youtubeResults] = await Promise.all([
+        fetchAudiusTracks(queryToSearch),
         fetchYouTubeMusic(queryToSearch),
       ])
       // New: Search for albums and fetch their songs
@@ -893,7 +945,7 @@ export default function VibraApp() {
       const albumSongPromises = albumResults.map((album) => fetchSongsFromAlbum(album.id))
       const songsFromAlbums = (await Promise.all(albumSongPromises)).flat()
 
-      const combinedResults: Song[] = [...saavnResults, ...youtubeResults, ...songsFromAlbums]
+      const combinedResults: Song[] = [...audiusResults, ...youtubeResults, ...songsFromAlbums]
 
       // Also search messages (this part remains the same)
       const messagesSnapshot = await getDocs(
@@ -935,7 +987,7 @@ export default function VibraApp() {
     performSearch(debouncedSearchQuery)
   }, [debouncedSearchQuery]) // Added allMessages to dependency array to re-run search when messages update
 
-  // Filter by mood from Saavn and YouTube APIs
+  // Filter by mood from Audius and YouTube APIs
   const handleMoodFilter = async (mood: string) => {
     setSelectedMood(mood)
     if (!mood) {
@@ -947,7 +999,7 @@ export default function VibraApp() {
       const queries = moodQueries[mood as keyof typeof moodQueries] || [mood]
       const allPromises: Promise<Song[]>[] = []
       for (const query of queries.slice(0, 3)) {
-        allPromises.push(fetchSaavnSongs(query))
+        allPromises.push(fetchAudiusTracks(query))
         allPromises.push(fetchYouTubeMusic(query))
       }
       const resultsArrays = await Promise.all(allPromises)
@@ -1230,7 +1282,7 @@ export default function VibraApp() {
       progressInterval.current = null
     }
 
-    if (song.audioUrl && song.source === "saavn") {
+    if (song.audioUrl && song.source !== "youtube") {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
 
@@ -1283,9 +1335,9 @@ export default function VibraApp() {
   }
 
   const handleSongEnd = () => {
-    // This function is only called by HTMLAudioElement.onended, so it only applies to Saavn songs.
+    // This function is only called by HTMLAudioElement.onended, so it only applies to direct audio streams (non-YouTube).
     const activeSong = songs.find((s) => s.id === currentlyPlaying) || currentPlaylist?.songs[currentSongIndex]
-    if (!activeSong || activeSong.source !== "saavn" || !activeSong.audioUrl) {
+    if (!activeSong || activeSong.source === "youtube" || !activeSong.audioUrl) {
       // Ensure it's an audio song that actually ended
       setCurrentlyPlaying(null)
       setCurrentAudio(null)
@@ -1360,7 +1412,7 @@ export default function VibraApp() {
 
     // If more than 3 seconds into the song, restart it (only for audio)
     const activeSong = currentQueue[currentIndex]
-    if (activeSong.source === "saavn" && currentAudio && currentAudio.currentTime > 3) {
+    if (activeSong.source !== "youtube" && currentAudio && currentAudio.currentTime > 3) {
       currentAudio.currentTime = 0
       return
     }
@@ -1371,7 +1423,7 @@ export default function VibraApp() {
         prevIndex = currentQueue.length - 1
       } else {
         // At the beginning, just restart current song (if audio) or do nothing (if YouTube)
-        if (activeSong.source === "saavn" && activeSong.audioUrl) {
+        if (activeSong.source !== "youtube" && activeSong.audioUrl) {
           togglePlayback(activeSong) // Restart current audio song
         } else {
           // For YouTube or no audio, just stay on current or do nothing
@@ -1396,7 +1448,7 @@ export default function VibraApp() {
     toast.success(`Repeat mode: ${modes[nextIndex]}`)
   }
 
-  // Unified togglePlayback function to handle both Saavn audio and YouTube embeds
+  // Unified togglePlayback function to handle both streamed audio and YouTube embeds
   const togglePlayback = (song: Song) => {
     // Always clear existing audio playback
     if (currentAudio) {
@@ -1425,7 +1477,7 @@ export default function VibraApp() {
     // Set the new song as currently playing
     setCurrentlyPlaying(song.id)
 
-    if (song.source === "saavn" && song.audioUrl) {
+    if (song.source !== "youtube" && song.audioUrl) {
       const audio = new Audio(song.audioUrl)
       audio.crossOrigin = "anonymous"
       setCurrentTime(0)
