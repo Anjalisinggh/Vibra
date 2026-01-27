@@ -1610,9 +1610,9 @@ export default function VibraApp() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <Headphones className="h-8 w-8 text-purple-600" />
+                <Headphones className="h-8 w-8 text-primary" />
                 <Link href="/">
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  <h1 className="text-2xl font-bold text-gradient">
                     Vibra
                   </h1>
                 </Link>
@@ -1679,7 +1679,7 @@ export default function VibraApp() {
                                     }}
                                     disabled={playlist.songs.length === 0}
                                     size="sm"
-                                    className="bg-gradient-to-r from-purple-600 to-pink-600"
+                                    className="btn-gradient"
                                   >
                                     <PlayCircle className="h-4 w-4 mr-1" />
                                     Play
@@ -1756,7 +1756,7 @@ export default function VibraApp() {
                       </DialogHeader>
                       <div className="space-y-6 mt-4">
                         <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                          <div className="w-16 h-16 btn-gradient rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                             {user.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -1766,11 +1766,11 @@ export default function VibraApp() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <Card className="p-4 text-center">
-                            <h4 className="text-2xl font-bold text-purple-600">{playlists.length}</h4>
+                            <h4 className="text-2xl font-bold text-primary">{playlists.length}</h4>
                             <p className="text-sm text-gray-600 dark:text-gray-300">Playlists Created</p>
                           </Card>
                           <Card className="p-4 text-center">
-                            <h4 className="text-2xl font-bold text-pink-600">
+                            <h4 className="text-2xl font-bold text-primary">
                               {playlists.reduce((total, playlist) => total + playlist.songs.length, 0)}
                             </h4>
                             <p className="text-sm text-gray-600 dark:text-gray-300">Songs Saved</p>
@@ -2048,7 +2048,7 @@ export default function VibraApp() {
                   Sign In
                 </Button>
                 <Button
-                  className="w-full justify-start bg-gradient-to-r from-purple-600 to-pink-600"
+                  className="w-full justify-start btn-gradient"
                   onClick={() => {
                     setShowSignUp(true)
                     setMobileMenuOpen(false)
@@ -2187,7 +2187,7 @@ export default function VibraApp() {
                                 }}
                               />
                               <div
-                                className="absolute top-0 left-0 h-2 bg-purple-600 rounded-l-full"
+                                className="absolute top-0 left-0 h-2 bg-primary rounded-l-full shadow-sm"
                                 style={{ width: `${playbackProgress}%` }}
                               />
                             </div>
@@ -2213,12 +2213,12 @@ export default function VibraApp() {
                         variant="ghost"
                         size="sm"
                         onClick={toggleRepeat}
-                        className={repeatMode !== "none" ? "text-purple-600" : ""}
+                        className={repeatMode !== "none" ? "text-primary" : ""}
                         disabled={isYouTube} // Disable repeat for YouTube
                       >
                         <Repeat className="h-4 w-4" />
                         {repeatMode === "one" && (
-                          <span className="absolute -top-1 -right-1 text-xs bg-purple-600 text-white rounded-full w-4 h-4 flex items-center justify-center">
+                          <span className="absolute -top-1 -right-1 text-xs bg-primary text-white rounded-full w-4 h-4 flex items-center justify-center shadow-sm">
                             1
                           </span>
                         )}
@@ -2251,7 +2251,7 @@ export default function VibraApp() {
                 "Every song tells a story, every story finds its song - especially those love and romance melodies that
                 speak to the heart"
               </span>
-              <Heart className="h-4 w-4 text-pink-500" />
+              <Heart className="h-4 w-4 text-primary" />
             </div>
           </div>
           {/* Search and Filters */}
@@ -2263,12 +2263,12 @@ export default function VibraApp() {
                   placeholder="Search by song name, artist, or emotion..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-14 text-lg rounded-full border-2 focus:border-purple-500"
+                  className="pl-12 h-14 text-lg rounded-full border-2 focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
               </div>
               <Button
                 onClick={() => performSearch(searchQuery)} // Explicit search on button click
-                className="h-14 px-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                className="h-14 px-8 rounded-full btn-gradient text-base font-semibold"
                 disabled={isLoading}
               >
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
@@ -2280,7 +2280,7 @@ export default function VibraApp() {
                 variant={selectedMood === "" ? "default" : "outline"}
                 size="sm"
                 onClick={() => handleMoodFilter("")}
-                className={selectedMood === "" ? "bg-gradient-to-r from-purple-600 to-pink-600" : ""}
+                className={selectedMood === "" ? "btn-gradient" : ""}
               >
                 <Filter className="h-4 w-4 mr-1" />
                 All Moods
@@ -2293,8 +2293,8 @@ export default function VibraApp() {
                   onClick={() => handleMoodFilter(mood.key)}
                   className={
                     selectedMood === mood.key
-                      ? "bg-gradient-to-r from-purple-600 to-pink-600"
-                      : "hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                      ? "btn-gradient"
+                      : "hover:bg-accent hover:text-accent-foreground"
                   }
                 >
                   <span className="mr-1">{mood.icon}</span>
@@ -2306,7 +2306,7 @@ export default function VibraApp() {
           {/* Loading State */}
           {isLoading && (
             <div className="text-center py-12">
-              <Loader2 className="h-12 w-12 text-purple-600 mx-auto mb-4 animate-spin" />
+              <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
               <p className="text-gray-600 dark:text-gray-300">Finding tracks </p>
             </div>
@@ -2368,7 +2368,7 @@ export default function VibraApp() {
                         </div>
                         <div className="p-4 space-y-3">
                           <div>
-                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 group-hover:text-purple-600 transition-colors line-clamp-1">
+                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 group-hover:text-primary transition-colors line-clamp-1">
                               {song.title}
                             </h3>
                             <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
@@ -2586,7 +2586,7 @@ export default function VibraApp() {
                               <DialogTrigger asChild>
                                 <Button
                                   size="sm"
-                                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                  className="btn-gradient"
                                   onClick={(e) => {
                                     if (!firebaseUser) {
                                       e.preventDefault()
@@ -2646,7 +2646,7 @@ export default function VibraApp() {
                                         <Button
                                           onClick={() => addAnonymousMessage(song.id)}
                                           disabled={!newMessage.trim()}
-                                          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                                          className="btn-gradient"
                                         >
                                           Send Message
                                         </Button>
@@ -2801,20 +2801,20 @@ export default function VibraApp() {
         </DialogContent>
       </Dialog>
       <Toaster richColors position="top-center" />
-      <footer className="bg-gradient-to-r from-purple-900 via-fuchsia-800 to-pink-800 text-white py-2 px-4">
+      <footer className="bg-gradient-to-r from-primary/90 via-primary/80 to-primary/70 text-white py-2 px-4 shadow-lg">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-pink-200">Vibra</h2>
-            <span className="text-xs text-pink-300">Feel it. Share it. Play it.</span>
+            <h2 className="text-lg font-bold text-white/95">Vibra</h2>
+            <span className="text-xs text-white/80">Feel it. Share it. Play it.</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-pink-200">with 🤍 by Anjali</span>
+            <span className="text-xs text-white/80">with 🤍 by Anjali</span>
             <div className="flex gap-2">
               <a
                 href="https://www.instagram.com/anjalisinggh_12/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-pink-200 hover:text-white transition-colors"
+                className="text-white/80 hover:text-white transition-colors"
               >
                 <FaInstagram className="w-3 h-3" />
               </a>
@@ -2822,7 +2822,7 @@ export default function VibraApp() {
                 href="https://x.com/anjalisinggh12/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-pink-200 hover:text-blue-300 transition-colors"
+                className="text-white/80 hover:text-white transition-colors"
               >
                 <FaTwitter className="w-3 h-3" />
               </a>
@@ -2830,7 +2830,7 @@ export default function VibraApp() {
                 href="https://github.com/Anjalisinggh"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-pink-200 hover:text-white transition-colors"
+                className="text-white/80 hover:text-white transition-colors"
               >
                 <FaGithub className="w-3 h-3" />
               </a>
@@ -2842,7 +2842,7 @@ export default function VibraApp() {
         <Button
           variant="secondary"
           size="icon"
-          className="fixed bottom-4 right-4 rounded-full shadow-lg bg-purple-600 text-white hover:bg-purple-700 transition-opacity duration-300 z-50"
+          className="fixed bottom-4 right-4 rounded-full shadow-lg btn-gradient transition-opacity duration-300 z-50"
           onClick={scrollToTop}
           aria-label="Scroll to top"
         >
