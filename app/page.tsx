@@ -27,8 +27,6 @@ import {
   Search,
   Grid3X3,
   List,
-  Moon,
-  Sun,
   Play,
   Pause,
   Volume2,
@@ -83,6 +81,9 @@ import { Toaster } from "@/components/ui/sonner"
 import { useDebounce } from "@/hooks/use-debounce"
 // Add the Link import
 import Link from "next/link"
+import dynamic from "next/dynamic"
+
+const FaultyTerminal = dynamic(() => import("@/components/FaultyTerminal"), { ssr: false })
 
 const AUDIUS_APP_NAME = process.env.NEXT_PUBLIC_AUDIUS_APP_NAME || "vibra-unspoken"
 
@@ -409,9 +410,7 @@ const fetchAudiusTracks = async (query: string): Promise<Song[]> => {
 
   try {
     const res = await fetch(
-      `https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(trimmedQuery)}&app_name=${encodeURIComponent(
-        AUDIUS_APP_NAME,
-      )}`,
+      `/api/audius/search?query=${encodeURIComponent(trimmedQuery)}`,
     )
     if (!res.ok) {
       console.error(`Audius search failed with status ${res.status}`)
@@ -520,9 +519,7 @@ const fetchSongById = async (
   } else if (id.startsWith("audius_")) {
     try {
       const audiusId = id.replace("audius_", "")
-      const res = await fetch(
-        `https://api.audius.co/v1/tracks/${audiusId}?app_name=${encodeURIComponent(AUDIUS_APP_NAME)}`,
-      )
+      const res = await fetch(`/api/audius/track/${encodeURIComponent(audiusId)}`)
       if (!res.ok) {
         console.error(`Audius track lookup failed with status ${res.status}`)
         return null
@@ -734,7 +731,7 @@ export default function VibraApp() {
   const [youTubePlayerOpen, setYouTubePlayerOpen] = useState(false)
   const [currentYouTubeVideoId, setCurrentYouTubeVideoId] = useState<string | null>(null)
   const [currentYouTubeSongTitle, setCurrentYouTubeSongTitle] = useState<string | null>(null)
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [isDarkMode] = useState(true) // Always dark mode; light mode removed
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [searchQuery, setSearchQuery] = useState("")
   const debouncedSearchQuery = useDebounce(searchQuery, 500) // Debounce search query
@@ -1598,13 +1595,35 @@ export default function VibraApp() {
   const moodFilters = [{ key: "love", label: "Love & Romance", icon: "💕" }]
 
   return (
-    <div
-      className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "dark bg-gray-900" : "bg-gray-50"}`}
-    >
+    <div className="relative flex flex-col min-h-screen transition-colors duration-300">
+      {/* Faulty terminal background - must stay position:fixed to fill viewport */}
+      <div className="fixed inset-0 z-0 w-full h-full opacity-70">
+        <FaultyTerminal
+          scale={1.5}
+          gridMul={[2, 1]}
+          digitSize={1.2}
+          timeScale={0.5}
+          pause={false}
+          scanlineIntensity={0.5}
+          glitchAmount={1}
+          flickerAmount={1}
+          noiseAmp={1}
+          chromaticAberration={0}
+          dither={0}
+          curvature={0.1}
+          tint="#8868d4"
+          mouseReact
+          mouseStrength={0.5}
+          pageLoadAnimation
+          brightness={0.6}
+        />
+      </div>
+      {/* Content layer - transparent so FaultyTerminal shows through */}
+      <div className="relative z-10 flex flex-col min-h-screen bg-transparent">
       {/* Header */}
       <header
         ref={headerRef}
-        className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-gray-800/95 dark:border-gray-800"
+        className="sticky top-0 z-50 border-b border-[#8868d4]/30 bg-[#8868d4]/10 backdrop-blur-md supports-[backdrop-filter]:bg-[#8868d4]/5 dark:bg-[#1a0f2e]/90 dark:border-[#8868d4]/40"
       >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -1617,7 +1636,7 @@ export default function VibraApp() {
                   </h1>
                 </Link>
               </div>
-              <p className="hidden md:block text-sm text-gray-600 dark:text-gray-300 italic">
+              <p className="hidden md:block text-sm text-[#8868d4]/90 dark:text-[#b088f0]/90 italic">
                 Feel the music, speak the unspoken.
               </p>
             </div>
@@ -1966,10 +1985,6 @@ export default function VibraApp() {
                 {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
                 <span className="ml-2 hidden md:inline">{viewMode === "grid" ? "List View" : "Grid View"}</span>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setIsDarkMode(!isDarkMode)}>
-                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                <span className="ml-2 hidden md:inline">{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
-              </Button>
             </div>
           </div>
         </div>
@@ -1999,17 +2014,6 @@ export default function VibraApp() {
                 >
                   <User className="h-4 w-4 mr-2" />
                   Profile
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setIsDarkMode(!isDarkMode)
-                    setMobileMenuOpen(false)
-                  }}
-                >
-                  {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-                  {isDarkMode ? "Light Mode" : "Dark Mode"}
                 </Button>
                 <Button
                   variant="ghost"
@@ -2056,17 +2060,6 @@ export default function VibraApp() {
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Sign Up
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setIsDarkMode(!isDarkMode)
-                    setMobileMenuOpen(false)
-                  }}
-                >
-                  {isDarkMode ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-                  {isDarkMode ? "Light Mode" : "Dark Mode"}
                 </Button>
                 <Button
                   variant="ghost"
@@ -2235,8 +2228,7 @@ export default function VibraApp() {
             </div>
           </div>
         )}
-      <main className="flex-1 overflow-auto">
-        {" "}
+      <main className="flex-1 overflow-auto bg-transparent">
         {/* Main content area, takes remaining space and scrolls */}
         <div className="container mx-auto px-4 py-8">
           {/* Hero Section */}
@@ -2316,7 +2308,7 @@ export default function VibraApp() {
             <div
               className={`${
                 viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6"
                   : "space-y-4 max-w-4xl mx-auto"
               }`}
             >
@@ -2849,6 +2841,7 @@ export default function VibraApp() {
           <ArrowUp className="h-5 w-5" />
         </Button>
       )}
+      </div>
     </div>
   )
 }
