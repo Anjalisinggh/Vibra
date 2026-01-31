@@ -54,6 +54,15 @@ body {
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
+
+  /* App background: dark with purple glow (fallback when DarkVeil fails or while loading) */
+  .bg-vibra-app {
+    background-color: #0f0a1a;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 20% 20%, rgba(136, 104, 212, 0.35) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 60%, rgba(88, 28, 135, 0.25) 0%, transparent 45%),
+      radial-gradient(ellipse 50% 30% at 50% 80%, rgba(126, 34, 206, 0.15) 0%, transparent 40%);
+  }
 }
 
 @layer base {

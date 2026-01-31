@@ -83,7 +83,7 @@ import { useDebounce } from "@/hooks/use-debounce"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 
-const FaultyTerminal = dynamic(() => import("@/components/FaultyTerminal"), { ssr: false })
+const DarkVeil = dynamic(() => import("@/components/DarkVeil"), { ssr: false })
 
 const AUDIUS_APP_NAME = process.env.NEXT_PUBLIC_AUDIUS_APP_NAME || "vibra-unspoken"
 
@@ -1595,48 +1595,37 @@ export default function VibraApp() {
   const moodFilters = [{ key: "love", label: "Love & Romance", icon: "💕" }]
 
   return (
-    <div className="relative flex flex-col min-h-screen transition-colors duration-300">
-      {/* Faulty terminal background - must stay position:fixed to fill viewport */}
-      <div className="fixed inset-0 z-0 w-full h-full opacity-70">
-        <FaultyTerminal
-          scale={1.5}
-          gridMul={[2, 1]}
-          digitSize={1.2}
-          timeScale={0.5}
-          pause={false}
-          scanlineIntensity={0.5}
-          glitchAmount={1}
-          flickerAmount={1}
-          noiseAmp={1}
-          chromaticAberration={0}
-          dither={0}
-          curvature={0.1}
-          tint="#8868d4"
-          mouseReact
-          mouseStrength={0.5}
-          pageLoadAnimation
-          brightness={0.6}
+    <div className="relative flex flex-col min-h-screen transition-colors duration-300 dark">
+      {/* DarkVeil background + CSS fallback (dark purple glow when WebGL fails) */}
+      <div className="fixed inset-0 z-0 w-full h-full bg-vibra-app">
+        <DarkVeil
+          hueShift={0}
+          noiseIntensity={0}
+          scanlineIntensity={0}
+          speed={0.5}
+          scanlineFrequency={0}
+          warpAmount={0}
         />
       </div>
-      {/* Content layer - transparent so FaultyTerminal shows through */}
+      {/* Content layer - transparent so DarkVeil shows through */}
       <div className="relative z-10 flex flex-col min-h-screen bg-transparent">
       {/* Header */}
       <header
         ref={headerRef}
-        className="sticky top-0 z-50 border-b border-[#8868d4]/30 bg-[#8868d4]/10 backdrop-blur-md supports-[backdrop-filter]:bg-[#8868d4]/5 dark:bg-[#1a0f2e]/90 dark:border-[#8868d4]/40"
+        className="sticky top-0 z-50 border-b border-white/10 bg-[#0f0a1a]/95 backdrop-blur-md"
       >
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <Headphones className="h-8 w-8 text-primary" />
+                <Headphones className="h-8 w-8 text-[#a078e8]" />
                 <Link href="/">
                   <h1 className="text-2xl font-bold text-gradient">
                     Vibra
                   </h1>
                 </Link>
               </div>
-              <p className="hidden md:block text-sm text-[#8868d4]/90 dark:text-[#b088f0]/90 italic">
+              <p className="hidden md:block text-sm text-white/70 italic">
                 Feel the music, speak the unspoken.
               </p>
             </div>
@@ -1990,7 +1979,7 @@ export default function VibraApp() {
         </div>
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="sm:hidden bg-white dark:bg-gray-800 border-t dark:border-gray-700 p-4 space-y-4">
+          <div className="sm:hidden bg-[#1a1225] border-t border-white/10 p-4 space-y-4">
             {user ? (
               <>
                 <Button
@@ -2081,7 +2070,7 @@ export default function VibraApp() {
       {currentlyPlaying &&
         headerHeight > 0 && ( // Only show if something is marked as playing and header height is known
           <div
-            className="sticky z-40 bg-white/95 backdrop-blur dark:bg-gray-800/95 border-b dark:border-gray-800 px-4 py-2"
+            className="sticky z-40 bg-[#0f0a1a]/95 backdrop-blur border-b border-white/10 px-4 py-2"
             style={{ top: `${headerHeight}px` }} // Dynamically set top based on header height
           >
             <div className="container mx-auto">
@@ -2234,11 +2223,11 @@ export default function VibraApp() {
           {/* Hero Section */}
           <div className="text-center mb-12">
             <div className="flex items-center justify-center gap-2 mb-4">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
                 Where your emotions meet their soundtrack
               </h2>
             </div>
-            <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-center gap-2 text-sm text-white/70">
               <span className="italic">
                 "Every song tells a story, every story finds its song - especially those love and romance melodies that
                 speak to the heart"
@@ -2250,12 +2239,12 @@ export default function VibraApp() {
           <div className="mb-8 space-y-4">
             <div className="relative max-w-2xl mx-auto flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/50" />
                 <Input
                   placeholder="Search by song name, artist, or emotion..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 h-14 text-lg rounded-full border-2 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="pl-12 h-14 text-lg rounded-full border-2 border-white/20 bg-white/5 text-white placeholder:text-white/40 focus:border-[#8868d4] focus:ring-2 focus:ring-[#8868d4]/30"
                 />
               </div>
               <Button
@@ -2299,8 +2288,8 @@ export default function VibraApp() {
           {isLoading && (
             <div className="text-center py-12">
               <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Searching songs...</h3>
-              <p className="text-gray-600 dark:text-gray-300">Finding tracks </p>
+              <h3 className="text-lg font-semibold text-white mb-2">Searching songs...</h3>
+              <p className="text-white/70">Finding tracks </p>
             </div>
           )}
           {/* Songs Grid/List */}
@@ -2315,7 +2304,7 @@ export default function VibraApp() {
               {filteredSongs.map((song) => (
                 <Card
                   key={song.id}
-                  className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white dark:bg-gray-800/90 border-0 shadow-md overflow-hidden"
+                  className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-[#1a1225]/90 border border-white/10 shadow-lg overflow-hidden"
                 >
                   <CardContent className="p-0">
                     {viewMode === "grid" ? (
@@ -2360,10 +2349,10 @@ export default function VibraApp() {
                         </div>
                         <div className="p-4 space-y-3">
                           <div>
-                            <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 group-hover:text-primary transition-colors line-clamp-1">
+                            <h3 className="font-semibold text-lg text-white group-hover:text-[#a078e8] transition-colors line-clamp-1">
                               {song.title}
                             </h3>
-                            <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
+                            <p className="text-white/70 line-clamp-1">{song.artist}</p>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {song.mood.slice(0, 3).map((mood) => (
@@ -2378,7 +2367,7 @@ export default function VibraApp() {
                               </Badge>
                             ))}
                           </div>
-                          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center justify-between text-sm text-white/60">
                             <div className="flex items-center gap-1">
                               <Volume2 className="h-4 w-4" />
                               <span>{song.plays.toLocaleString()} plays</span>
@@ -2520,7 +2509,7 @@ export default function VibraApp() {
                                     song.messages.map((message) => (
                                       <div key={message.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                         <p className="text-gray-900 dark:text-gray-100 mb-2">{message.content}</p>
-                                        <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                                        <div className="flex items-center justify-between text-sm text-white/60">
                                           <div className="flex items-center gap-2">
                                             <Badge
                                               variant="secondary"
@@ -2668,7 +2657,7 @@ export default function VibraApp() {
                             <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 line-clamp-1">
                               {song.title}
                             </h3>
-                            <p className="text-gray-600 dark:text-gray-300 line-clamp-1">{song.artist}</p>
+                            <p className="text-white/70 line-clamp-1">{song.artist}</p>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {song.mood.slice(0, 3).map((mood) => (
@@ -2683,7 +2672,7 @@ export default function VibraApp() {
                               </Badge>
                             ))}
                           </div>
-                          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                          <div className="flex items-center justify-between text-sm text-white/60">
                             <div className="flex items-center gap-1">
                               <Volume2 className="h-4 w-4" />
                               <span>{song.plays.toLocaleString()} plays</span>
@@ -2730,8 +2719,8 @@ export default function VibraApp() {
           {!isLoading && filteredSongs.length === 0 && (
             <div className="text-center py-12">
               <Music className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No songs found</h3>
-              <p className="text-gray-600 dark:text-gray-300">Try Again </p>
+              <h3 className="text-lg font-semibold text-white mb-2">No songs found</h3>
+              <p className="text-white/70">Try Again </p>
             </div>
           )}
         </div>
